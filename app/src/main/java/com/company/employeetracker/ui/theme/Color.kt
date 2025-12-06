@@ -3,9 +3,9 @@ package com.company.employeetracker.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Primary Colors
-val GreenPrimary = Color(0xFF2E7D32)
+val GreenPrimary = Color(0xFF1F5B21)
 val GreenLight = Color(0xFF4CAF50)
-val GreenDark = Color(0xFF1B5E20)
+val GreenDark = Color(0xFF45A148)
 
 // Admin Theme
 val IndigoPrimary = Color(0xFF3949AB)

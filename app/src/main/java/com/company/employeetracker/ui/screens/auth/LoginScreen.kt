@@ -21,11 +21,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.company.employeetracker.ui.theme.GreenDark
 import com.company.employeetracker.ui.theme.GreenPrimary
 import com.company.employeetracker.viewmodel.AuthViewModel
+import android.content.res.Configuration
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onLoginSuccess: (isAdmin: Boolean) -> Unit,
+    onForgotPasswordClick: () -> Unit,
     viewModel: AuthViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
@@ -194,7 +198,7 @@ fun LoginScreen(
                             )
                         }
 
-                        TextButton(onClick = { /* TODO */ }) {
+                        TextButton(onClick = onForgotPasswordClick) {
                             Text(
                                 text = "Forgot password?",
                                 color = GreenPrimary,
@@ -296,10 +300,32 @@ fun LoginScreen(
             Text(
                 text = "Powered by MindMatrix",
                 fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.7f)
+                color = Color.Black.copy(alpha = 0.7f)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@Preview(
+    name = "Login – Light",
+    showBackground = true,
+    showSystemUi = true
+)
+//@Preview(
+//    name = "Login – Dark",
+//    uiMode = Configuration.UI_MODE_NIGHT_YES,
+//    showBackground = true,
+//    showSystemUi = true
+//)
+@Composable
+fun LoginScreenPreview() {
+    // If you have your own theme, wrap with it instead of MaterialTheme
+    MaterialTheme {
+        LoginScreen(
+            onLoginSuccess = { /* no-op for preview */ },
+            onForgotPasswordClick = { /* no-op for preview */ }
+        )
     }
 }

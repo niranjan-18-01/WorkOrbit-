@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -18,6 +17,7 @@ import com.company.employeetracker.ui.components.AdminBottomNavBar
 import com.company.employeetracker.ui.components.EmployeeBottomNavBar
 import com.company.employeetracker.ui.screens.admin.*
 import com.company.employeetracker.ui.screens.auth.LoginScreen
+import com.company.employeetracker.ui.screens.auth.ForgotPasswordScreen
 import com.company.employeetracker.ui.screens.employee.*
 import com.company.employeetracker.ui.theme.EmployeeTrackerTheme
 import com.company.employeetracker.viewmodel.AuthViewModel
@@ -49,8 +49,8 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
 
     val isAdmin = currentUser?.role == "admin"
 
-    // Show bottom bar only when logged in and not on login screen
-    val showBottomBar = currentUser != null && currentRoute != "login"
+    // Show bottom bar only when logged in and not on login or forgot password screens
+    val showBottomBar = currentUser != null && currentRoute != "login" && currentRoute != "forgot_password"
 
     Scaffold(
         bottomBar = {
@@ -106,7 +106,15 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
                             }
                         }
                     },
+                    onForgotPasswordClick = { navController.navigate("forgot_password") },
                     viewModel = authViewModel
+                )
+            }
+
+            // Forgot Password Screen
+            composable("forgot_password") {
+                ForgotPasswordScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
 

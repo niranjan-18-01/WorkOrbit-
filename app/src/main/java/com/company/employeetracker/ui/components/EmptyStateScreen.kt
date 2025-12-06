@@ -1,4 +1,4 @@
-package com.company.employeetracker.ui.screens.employee
+package com.company.employeetracker.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -30,6 +30,7 @@ import com.company.employeetracker.ui.components.ErrorStateScreen
 import com.company.employeetracker.ui.components.LoadingScreen
 
 
+
 @Composable
 fun EmployeeHomeScreen(
     currentUser: User,
@@ -46,7 +47,7 @@ fun EmployeeHomeScreen(
             hasError = false
             taskViewModel.loadTasksForEmployee(currentUser.id)
             reviewViewModel.loadReviewsForEmployee(currentUser.id)
-            // Small delay to allow UI to show loading state briefly; remove in production
+            // Small delay to allow UI to show loading state briefly; remove/replace in production
             delay(300)
             isLoading = false
         } catch (e: Exception) {
@@ -61,7 +62,9 @@ fun EmployeeHomeScreen(
     val pendingCount by taskViewModel.pendingCount.collectAsState()
     val completedCount by taskViewModel.completedCount.collectAsState()
 
-    val totalTasks by remember(activeCount, pendingCount, completedCount) { mutableStateOf(activeCount + pendingCount + completedCount) }
+    val totalTasks by remember(activeCount, pendingCount, completedCount) {
+        mutableStateOf(activeCount + pendingCount + completedCount)
+    }
     val completionPercentage by remember(totalTasks, completedCount) {
         mutableStateOf(if (totalTasks > 0) (completedCount * 100) / totalTasks else 0)
     }
@@ -69,14 +72,12 @@ fun EmployeeHomeScreen(
 
     // Show Loading
     if (isLoading) {
-        // Assume LoadingScreen composable exists in your project. Replace with your own if different.
         LoadingScreen(message = "Loading your dashboard...")
         return
     }
 
     // Show Error
     if (hasError) {
-        // Assume ErrorStateScreen composable exists in your project. Replace with your own if different.
         ErrorStateScreen(
             title = "Failed to Load Data",
             message = "We couldn't load your dashboard. Please check your connection and try again.",
@@ -356,8 +357,8 @@ fun EmployeeHomeScreen(
                 }
             }
 
-            // Latest Review
-            if (latestReview != null) {
+            // Latest Review using .let to avoid smart-cast error
+            latestReview?.let { review ->
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                     Card(
@@ -391,7 +392,7 @@ fun EmployeeHomeScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = latestReview.date ?: "",
+                                            text = review.date ?: "",
                                             fontSize = 12.sp,
                                             color = Color(0xFF757575)
                                         )
@@ -403,7 +404,7 @@ fun EmployeeHomeScreen(
                                     color = AccentYellow.copy(alpha = 0.1f)
                                 ) {
                                     Text(
-                                        text = "${latestReview.overallRating}/5",
+                                        text = "${review.overallRating}/5",
                                         color = Color(0xFFFF8F00),
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
@@ -415,7 +416,7 @@ fun EmployeeHomeScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = latestReview.remarks ?: "",
+                                text = review.remarks ?: "",
                                 fontSize = 14.sp,
                                 color = Color(0xFF424242),
                                 lineHeight = 20.sp
