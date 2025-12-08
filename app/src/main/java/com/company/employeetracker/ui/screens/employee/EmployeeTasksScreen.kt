@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.company.employeetracker.ui.components.TaskDetailsScreen
 import com.company.employeetracker.data.database.entities.Task
 import com.company.employeetracker.data.database.entities.User
 import com.company.employeetracker.ui.theme.*
@@ -267,7 +266,6 @@ fun EmployeeTasksScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Pending
                     StatusCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Schedule,
@@ -277,7 +275,6 @@ fun EmployeeTasksScreen(
                         backgroundColor = AccentRed.copy(alpha = 0.1f)
                     )
 
-                    // Active
                     StatusCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.PlayArrow,
@@ -287,7 +284,6 @@ fun EmployeeTasksScreen(
                         backgroundColor = AccentOrange.copy(alpha = 0.1f)
                     )
 
-                    // Completed
                     StatusCard(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.CheckCircle,
@@ -348,16 +344,7 @@ fun EmployeeTasksScreen(
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
-                                } else null,
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = GreenPrimary,
-                                    selectedLabelColor = Color.White,
-                                    selectedLeadingIconColor = Color.White
-                                ),
-                                border = if (selectedFilter == filter) null else FilterChipDefaults.filterChipBorder(
-                                    borderColor = Color(0xFFE0E0E0),
-                                    selectedBorderColor = GreenPrimary
-                                )
+                                } else null
                             )
                         }
                     }
@@ -510,9 +497,8 @@ fun EnhancedTaskCard(
                         color = Color(0xFF757575),
                         maxLines = 2
                     )
-                    //Column
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -527,52 +513,52 @@ fun EnhancedTaskCard(
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Flag,
-                            contentDescription = "Priority",
-                            tint = priorityColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = task.priority,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = priorityColor
-                        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = "Priority",
+                        tint = priorityColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = task.priority,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = priorityColor
+                    )
 
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Deadline",
-                            tint = Color(0xFF757575),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = task.deadline,
-                            fontSize = 12.sp,
-                            color = Color(0xFF757575)
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(16.dp))
 
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = "View Details",
-                        tint = GreenPrimary,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = "Deadline",
+                        tint = Color(0xFF757575),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = task.deadline,
+                        fontSize = 12.sp,
+                        color = Color(0xFF757575)
                     )
                 }
+
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "View Details",
+                    tint = GreenPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

@@ -27,6 +27,9 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private val _completedCount = MutableStateFlow(0)
     val completedCount: StateFlow<Int> = _completedCount
 
+    // Store current employee ID for reload operations
+    private var currentEmployeeId: Int? = null
+
     init {
         loadAllTasks()
     }
@@ -41,6 +44,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadTasksForEmployee(employeeId: Int) {
+        currentEmployeeId = employeeId
         viewModelScope.launch {
             taskDao.getTasksByEmployee(employeeId).collect { tasks ->
                 _employeeTasks.value = tasks
@@ -67,10 +71,18 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateTaskStatus(taskId: Int, newStatus: String) {
         viewModelScope.launch {
-            // Update task in database
-            taskRepository.updateTaskStatus(taskId, newStatus)
-            // Reload tasks
-            loadTasksForEmployee(currentEmployeeId)
+            // Get the task first
+            val task = taskDao.getTaskById(taskId)
+            task?.let {
+                // Update the task with new status
+                val updatedTask = it.copy(status = newStatus)
+                taskDao.updateTask(updatedTask)
+
+                // Reload tasks if we have a current employee
+                currentEmployeeId?.let { empId ->
+                    loadTasksForEmployee(empId)
+                }
+            }
         }
     }
 
