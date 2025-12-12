@@ -339,14 +339,7 @@ fun AdminEmployeesScreen(
                             "No employees match your search criteria."
                         } else {
                             "Start by adding your first employee to the system."
-                        },
-                        actionText = if (searchQuery.isEmpty()) "Add Employee" else null,
-                        onActionClick = if (searchQuery.isEmpty()) {
-                            { showAddEmployeeDialog = true }
-                        } else null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(400.dp)
+                        }
                     )
                 }
             } else {

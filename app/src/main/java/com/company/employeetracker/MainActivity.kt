@@ -137,6 +137,7 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
                 }
             }
 
+
             composable("tasks") {
                 currentUser?.let { user ->
                     EmployeeTasksScreen(

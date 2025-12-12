@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    //id("com.google.gms.google-services") // Added this plugin
     id("com.google.devtools.ksp") version "1.9.22-1.0.17"
     alias(libs.plugins.google.gms.google.services)
 }
@@ -52,10 +53,19 @@ android {
 }
 
 dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+
+    // TODO: Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth-ktx") // Removed version, using BoM
+    implementation("com.google.firebase:firebase-database-ktx") // Removed version, using BoM
+
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.8.2") // Kept newer version
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
@@ -72,15 +82,13 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    implementation("com.google.firebase:firebase-auth-ktx:22.1.0")
-    // check latest version in your project
-    implementation("androidx.activity:activity-compose:1.7.2")
+    // Removed duplicate activity-compose:1.7.2
     implementation("androidx.compose.material:material:1.5.0")
 
     // Room Database (FIXED VERSION)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    implementation(libs.firebase.database)
+    // Removed implementation(libs.firebase.database) as firebase-database-ktx is now using BoM
     ksp("androidx.room:room-compiler:2.6.1")
 
     // Coroutines
@@ -91,6 +99,9 @@ dependencies {
 
     // Coil for Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Kotlin Coroutines for Firebase
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

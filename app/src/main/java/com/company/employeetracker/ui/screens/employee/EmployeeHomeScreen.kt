@@ -32,7 +32,8 @@ import com.company.employeetracker.viewmodel.MessageViewModel
 fun EmployeeHomeScreen(
     currentUser: User,
     onTaskClick: (Int) -> Unit = {},
-    onNavigateToSelectEmployee: () -> Unit = {}, // ADD THIS PARAMETER
+    onNavigateToSelectEmployee: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {}, // Added this parameter
     taskViewModel: TaskViewModel = viewModel(),
     reviewViewModel: ReviewViewModel = viewModel()
 ) {
@@ -57,13 +58,12 @@ fun EmployeeHomeScreen(
     val reviews by reviewViewModel.employeeReviews.collectAsState()
     val activeCount by taskViewModel.activeCount.collectAsState()
     val pendingCount by taskViewModel.pendingCount.collectAsState()
-    val completedCount by taskViewModel.completedCount.collectAsState()
+    val completedCount by taskViewModel.completedCount.collectAsState() // Corrected this line
 
     val totalTasks = activeCount + pendingCount + completedCount
     val completionPercentage = if (totalTasks > 0) (completedCount * 100) / totalTasks else 0
     val latestReview = reviews.firstOrNull()
 
-    var showNotifications by remember { mutableStateOf(false) }
     val messageViewModel: MessageViewModel = viewModel()
 
     LaunchedEffect(currentUser.id) {
@@ -89,7 +89,6 @@ fun EmployeeHomeScreen(
         return
     }
 
-    // WRAP IN SCAFFOLD WITH FAB
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
@@ -114,9 +113,8 @@ fun EmployeeHomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFFF5F5F5))
-                    .padding(paddingValues) // APPLY SCAFFOLD PADDING
+                    .padding(paddingValues)
             ) {
-                // Header
                 item {
                     Box(
                         modifier = Modifier
@@ -174,7 +172,7 @@ fun EmployeeHomeScreen(
                             }
 
                             Box {
-                                IconButton(onClick = { showNotifications = true }) {
+                                IconButton(onClick = onNavigateToNotifications) { // Changed onClick to use the new parameter
                                     Icon(
                                         imageVector = Icons.Default.Notifications,
                                         contentDescription = "Notifications",
@@ -200,14 +198,7 @@ fun EmployeeHomeScreen(
                                     }
                                 }
                             }
-
-                            if (showNotifications) {
-                                NotificationsScreen(
-                                    currentUser = currentUser,
-                                    onBackClick = { showNotifications = false },
-                                    onMessageClick = { /* Navigate to chat */ }
-                                )
-                            }
+                            // Removed the NotificationsScreen composable call here
                         }
                     }
                 }

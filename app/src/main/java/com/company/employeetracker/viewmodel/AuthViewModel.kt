@@ -18,19 +18,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError
 
-    fun login(email: String, password: String, onSuccess: () -> Unit) {
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    fun login(email: String, password: String, onComplete: () -> Unit) {
         viewModelScope.launch {
             try {
+                _isLoading.value = true
                 val user = userDao.login(email, password)
                 if (user != null) {
                     _currentUser.value = user
                     _loginError.value = null
-                    onSuccess()
                 } else {
                     _loginError.value = "Invalid email or password"
                 }
             } catch (e: Exception) {
                 _loginError.value = "Login failed: ${e.message}"
+            } finally {
+                _isLoading.value = false
+                onComplete()
             }
         }
     }
