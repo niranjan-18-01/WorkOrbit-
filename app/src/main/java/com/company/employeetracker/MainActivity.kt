@@ -28,12 +28,23 @@ import com.company.employeetracker.ui.screens.employee.ChatScreen
 import com.company.employeetracker.ui.screens.employee.SelectEmployeeScreen
 import com.company.employeetracker.ui.theme.EmployeeTrackerTheme
 import com.company.employeetracker.viewmodel.AuthViewModel
+import com.google.firebase.database.FirebaseDatabase
+import android.util.Log
+
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Firebase (if not already initialized)
+        try {
+            FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Firebase already initialized")
+        }
+
         setContent {
             EmployeeTrackerTheme {
                 Surface(

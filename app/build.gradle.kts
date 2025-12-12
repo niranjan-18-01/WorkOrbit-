@@ -1,9 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    //id("com.google.gms.google-services") // Added this plugin
+    id("com.google.gms.google-services") // keep explicit plugin (remove alias if not using version catalog)
     id("com.google.devtools.ksp") version "1.9.22-1.0.17"
-    alias(libs.plugins.google.gms.google.services)
+    // If you use a version catalog (libs.versions.toml) and want aliases, add them there and remove the explicit id(...)
 }
 
 android {
@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.company.employeetracker"
-        minSdk = 26 // Changed from 24 to 26
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -53,55 +53,51 @@ android {
 }
 
 dependencies {
-    // Import the Firebase BoM
+    // Firebase BoM (manage firebase versions)
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
 
-    // TODO: Add the dependencies for Firebase products you want to use
-    // When using the BoM, don't specify versions in Firebase dependencies
+    // Firebase artifacts (no versions when using BoM)
     implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth-ktx") // Removed version, using BoM
-    implementation("com.google.firebase:firebase-database-ktx") // Removed version, using BoM
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-database-ktx")
+
+    // Kotlin Coroutines for Firebase (keep a single entry)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2") // Kept newer version
+    implementation("androidx.activity:activity-compose:1.8.2")
 
-    // Compose
+    // Compose (using Compose BOM)
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-extended") // BOM handles version
+    implementation("androidx.compose.material:material:1.5.0") // optional if you rely on material (ok to keep)
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
-    // ViewModel
+    // ViewModel & Compose integration
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // Removed duplicate activity-compose:1.7.2
-    implementation("androidx.compose.material:material:1.5.0")
-
-    // Room Database (FIXED VERSION)
+    // Room (runtime + ktx) and KSP compiler
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
-    // Removed implementation(libs.firebase.database) as firebase-database-ktx is now using BoM
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // Coroutines
+    // Coroutines (Android)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Charts (MPAndroidChart for Compose)
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    // Charts
+    implementation("com.github.PhilJay:MPAndroidChart:3.1.0")
 
-    // Coil for Image Loading
+    // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
-
-    // Kotlin Coroutines for Firebase
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
