@@ -13,17 +13,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.company.employeetracker.ui.components.EmployeeCard
-import com.company.employeetracker.ui.theme.*
-import com.company.employeetracker.viewmodel.EmployeeViewModel
-import com.company.employeetracker.viewmodel.ReviewViewModel
-import com.company.employeetracker.viewmodel.TaskViewModel
 import com.company.employeetracker.ui.components.AddReviewDialog
+import com.company.employeetracker.ui.theme.*
+import com.company.employeetracker.viewmodel.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,477 +31,344 @@ import java.util.*
 fun AdminDashboardScreen(
     employeeViewModel: EmployeeViewModel = viewModel(),
     taskViewModel: TaskViewModel = viewModel(),
-    reviewViewModel: ReviewViewModel = viewModel()
+    reviewViewModel: ReviewViewModel = viewModel(),
+    messageViewModel: MessageViewModel = viewModel()
 ) {
     val employees by employeeViewModel.employees.collectAsState()
     val employeeCount by employeeViewModel.employeeCount.collectAsState()
     val allTasks by taskViewModel.allTasks.collectAsState()
     val allReviews by reviewViewModel.allReviews.collectAsState()
-    val reviewCount by reviewViewModel.reviewCount.collectAsState()
+    val unreadCount by messageViewModel.unreadCount.collectAsState()
+
+    LaunchedEffect(Unit) {
+        messageViewModel.loadUnreadCount(1)
+    }
 
     val completedTasks = allTasks.count { it.status == "Done" }
     val pendingTasks = allTasks.size - completedTasks
-    val averageRating = if (allReviews.isNotEmpty()) {
-        allReviews.map { it.overallRating }.average().toFloat()
-    } else 0f
+    val avgRating =
+        if (allReviews.isNotEmpty()) allReviews.map { it.overallRating }.average().toFloat() else 0f
 
-    // Get top performers
     val topPerformers = allReviews
         .groupBy { it.employeeId }
-        .mapValues { entry -> entry.value.map { it.overallRating }.average().toFloat() }
+        .mapValues { it.value.map { r -> r.overallRating }.average().toFloat() }
         .toList()
         .sortedByDescending { it.second }
         .take(3)
 
-    // Generate real-time activities from actual data
     val recentActivities = remember(employees, allTasks, allReviews) {
-        mutableListOf<ActivityItem>().apply {
-            // Recent employee additions
-            employees.sortedByDescending { it.joiningDate }.take(2).forEach { employee ->
+        buildList {
+            employees.sortedByDescending { it.joiningDate }.take(2).forEach {
                 add(
                     ActivityItem(
-                        icon = Icons.Default.PersonAdd,
-                        title = "New employee added",
-                        subtitle = "${employee.name} joined ${employee.department}",
-                        time = getRelativeTime(employee.joiningDate),
-                        iconColor = GreenPrimary
+                        Icons.Default.PersonAdd,
+                        "New Employee",
+                        "${it.name} joined ${it.department}",
+                        getRelativeTime(it.joiningDate),
+                        GreenPrimary,
+                        parseDate(it.joiningDate)
                     )
                 )
             }
 
-            // Recent task completions
-            allTasks.filter { it.status == "Done" }.sortedByDescending { it.deadline }
-                .take(2).forEach { task ->
-                    val employee = employees.find { it.id == task.employeeId }
+            allTasks.filter { it.status == "Done" }
+                .sortedByDescending { it.deadline }
+                .take(2)
+                .forEach {
+                    val emp = employees.find { e -> e.id == it.employeeId }
                     add(
                         ActivityItem(
-                            icon = Icons.Default.CheckCircle,
-                            title = "Task completed",
-                            subtitle = "${task.title} by ${employee?.name ?: "Unknown"}",
-                            time = getRelativeTime(task.deadline),
-                            iconColor = AccentBlue
+                            Icons.Default.CheckCircle,
+                            "Task Completed",
+                            "${it.title} by ${emp?.name ?: "Unknown"}",
+                            getRelativeTime(it.deadline),
+                            AccentBlue,
+                            parseDate(it.deadline)
                         )
                     )
                 }
 
-            // Recent reviews
-            allReviews.sortedByDescending { it.date }.take(2).forEach { review ->
-                val employee = employees.find { it.id == review.employeeId }
+            allReviews.sortedByDescending { it.date }.take(2).forEach {
+                val emp = employees.find { e -> e.id == it.employeeId }
                 add(
                     ActivityItem(
-                        icon = Icons.Default.Star,
-                        title = "Performance review",
-                        subtitle = "${employee?.name ?: "Unknown"} rated ${String.format("%.1f", review.overallRating)}/5.0",
-                        time = getRelativeTime(review.date),
-                        iconColor = AccentYellow
+                        Icons.Default.Star,
+                        "Performance Review",
+                        "${emp?.name ?: "Unknown"} rated ${it.overallRating}",
+                        getRelativeTime(it.date),
+                        AccentYellow,
+                        parseDate(it.date)
                     )
                 )
             }
-        }.sortedByDescending { it.time }.take(5)
+        }.sortedByDescending { it.timestamp }
     }
+
+    var showAllActivities by remember { mutableStateOf(false) }
+    var showReviewDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(Color(0xFFF4F6FA))
     ) {
-        // Header
+
+        /** HEADER **/
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            colors = listOf(IndigoPrimary, IndigoDark)
+                        Brush.verticalGradient(
+                            listOf(IndigoPrimary, IndigoDark)
                         )
                     )
                     .padding(24.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Welcome Back! 👋",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                            Text(
-                                text = "Admin Dashboard",
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "Empower your team through insights",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                        }
-
-                        IconButton(onClick = { /* Notifications */ }) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "Notifications",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Stats Grid
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
                 Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    AdminStatCard(
-                        icon = Icons.Default.People,
-                        value = employeeCount.toString(),
-                        label = "Total Employees",
-                        color = AccentBlue,
-                        modifier = Modifier.weight(1f)
-                    )
-                    AdminStatCard(
-                        icon = Icons.Default.CheckCircle,
-                        value = completedTasks.toString(),
-                        label = "Completed",
-                        color = GreenPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    AdminStatCard(
-                        icon = Icons.Default.Schedule,
-                        value = pendingTasks.toString(),
-                        label = "Pending Tasks",
-                        color = AccentOrange,
-                        modifier = Modifier.weight(1f)
-                    )
-                    AdminStatCard(
-                        icon = Icons.Default.Star,
-                        value = String.format("%.1f", averageRating),
-                        label = "Avg Rating",
-                        color = AccentYellow,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        // Top Performers Section
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Top Performers",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = "Trophy",
-                        tint = AccentYellow,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = GreenLight.copy(alpha = 0.1f)
-                ) {
-                    Text(
-                        text = "This Week",
-                        color = GreenPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-
-        // Top Performers List
-        items(topPerformers.take(3)) { (employeeId, rating) ->
-            val employee = employees.find { it.id == employeeId }
-            employee?.let {
-                Spacer(modifier = Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    EmployeeCard(
-                        employee = it,
-                        rating = rating
-                    )
-                }
-            }
-        }
-
-        // Recent Activities - REAL-TIME DATA
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Recent Activities",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = "Activity",
-                    tint = AccentOrange,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        if (recentActivities.isEmpty()) {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No recent activities",
-                            fontSize = 14.sp,
-                            color = Color(0xFF757575)
-                        )
-                    }
-                }
-            }
-        } else {
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(16.dp)
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        recentActivities.forEachIndexed { index, activity ->
-                            ActivityItemView(
-                                icon = activity.icon,
-                                title = activity.title,
-                                subtitle = activity.subtitle,
-                                time = activity.time,
-                                iconColor = activity.iconColor
+                        Text("Welcome Back", color = Color.White, fontSize = 14.sp)
+                        Text(
+                            "Admin Dashboard",
+                            color = Color.White,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Insights at a glance",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Box {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        if (unreadCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .offset(x = 18.dp, y = (-4).dp)
+                                    .clip(CircleShape)
+                                    .background(AccentRed)
                             )
-                            if (index < recentActivities.size - 1) {
-                                Divider()
-                            }
                         }
                     }
                 }
             }
         }
 
-        // Add Review Button
+        /** STATS **/
         item {
-            var showAddReviewDialog by remember { mutableStateOf(false) }
+            Spacer(Modifier.height(16.dp))
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AdminStatCard(Icons.Default.People, employeeCount.toString(), "Employees", AccentBlue, Modifier.weight(1f))
+                    AdminStatCard(Icons.Default.CheckCircle, completedTasks.toString(), "Completed", GreenPrimary, Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AdminStatCard(Icons.Default.Schedule, pendingTasks.toString(), "Pending", AccentOrange, Modifier.weight(1f))
+                    AdminStatCard(Icons.Default.Star, String.format("%.1f", avgRating), "Avg Rating", AccentYellow, Modifier.weight(1f))
+                }
+            }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { showAddReviewDialog = true },
+        /** TOP PERFORMERS **/
+        item {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Top Performers",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        items(topPerformers) { (id, rating) ->
+            val emp = employees.find { it.id == id }
+            emp?.let {
+                Card(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    EmployeeCard(employee = it, rating = rating)
+                }
+            }
+        }
+
+        /** RECENT ACTIVITIES **/
+        item {
+            Spacer(Modifier.height(16.dp))
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFC107)
-                ),
-                shape = RoundedCornerShape(12.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "Add Review"
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Add Performance Review",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            if (showAddReviewDialog) {
-                AddReviewDialog(
-                    onDismiss = { showAddReviewDialog = false },
-                    onReviewAdded = {
-                        // Review added successfully
+                Text("Recent Activities", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                if (recentActivities.size > 3) {
+                    TextButton(onClick = { showAllActivities = !showAllActivities }) {
+                        Text(if (showAllActivities) "Show Less" else "Show All")
                     }
-                )
+                }
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(100.dp))
+            Card(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column {
+                    val list =
+                        if (showAllActivities) recentActivities else recentActivities.take(3)
+
+                    list.forEachIndexed { index, activity ->
+                        ActivityItemView(
+                            activity = activity,
+                            highlight = index == 0
+                        )
+                        if (index < list.lastIndex) Divider()
+                    }
+                }
+            }
         }
+
+        /** ADD REVIEW **/
+        item {
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = { showReviewDialog = true },
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentYellow),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Default.Star, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Performance Review", fontWeight = FontWeight.Bold)
+            }
+        }
+
+        item { Spacer(Modifier.height(80.dp)) }
+    }
+
+    if (showReviewDialog) {
+        AddReviewDialog(
+            onDismiss = { showReviewDialog = false },
+            onReviewAdded = {}
+        )
     }
 }
 
-data class ActivityItem(
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val title: String,
-    val subtitle: String,
-    val time: String,
-    val iconColor: Color
-)
+/** ---------------- COMPONENTS ---------------- **/
 
 @Composable
 fun AdminStatCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     value: String,
     label: String,
     color: Color,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.height(120.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(16.dp)
+        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(6.dp)
     ) {
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
                 .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(color.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = color,
-                    modifier = Modifier.size(20.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .background(color.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, null, tint = color)
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
-
-            Column {
-                Text(
-                    text = value,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF212121)
-                )
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    color = Color(0xFF757575)
-                )
-            }
+            Text(label, fontSize = 13.sp, color = Color.Gray)
         }
     }
 }
 
 @Composable
-fun ActivityItemView(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    time: String,
-    iconColor: Color
-) {
+fun ActivityItemView(activity: ActivityItem, highlight: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (highlight) activity.iconColor.copy(alpha = 0.06f) else Color.Transparent)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier
-                .size(12.dp)
-                .background(iconColor, CircleShape)
+            Modifier
+                .size(if (highlight) 14.dp else 10.dp)
+                .background(activity.iconColor, CircleShape)
         )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF212121)
-            )
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = Color(0xFF757575)
-            )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(activity.title, fontWeight = FontWeight.SemiBold)
+            Text(activity.subtitle, fontSize = 12.sp, color = Color.Gray)
         }
-
-        Text(
-            text = time,
-            fontSize = 11.sp,
-            color = Color(0xFF9E9E9E)
-        )
+        Text(activity.time, fontSize = 11.sp, color = Color.Gray)
     }
 }
 
-private fun getRelativeTime(dateString: String): String {
-    return try {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val date = dateFormat.parse(dateString) ?: return "Unknown"
-        val now = Date()
-        val diff = now.time - date.time
-        val days = diff / (1000 * 60 * 60 * 24)
+/** ---------------- MODELS & UTILS ---------------- **/
 
+data class ActivityItem(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val time: String,
+    val iconColor: Color,
+    val timestamp: Long
+)
+
+private fun getRelativeTime(date: String): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val d = sdf.parse(date) ?: return "Unknown"
+        val days = (Date().time - d.time) / (1000 * 60 * 60 * 24)
         when {
             days < 1 -> "Today"
-            days < 2 -> "Yesterday"
+            days == 1L -> "Yesterday"
             days < 7 -> "${days}d ago"
             days < 30 -> "${days / 7}w ago"
             else -> "${days / 30}mo ago"
         }
     } catch (e: Exception) {
         "Unknown"
+    }
+}
+
+private fun parseDate(date: String): Long {
+    return try {
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(date)?.time ?: 0L
+    } catch (e: Exception) {
+        0L
     }
 }

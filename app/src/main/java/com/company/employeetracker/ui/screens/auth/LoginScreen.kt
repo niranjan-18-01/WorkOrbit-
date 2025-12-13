@@ -1,5 +1,6 @@
 package com.company.employeetracker.ui.screens.auth
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -32,9 +34,12 @@ fun LoginScreen(
     viewModel: AuthViewModel = viewModel(),
     onForgotPasswordClick: () -> Unit
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val sharedPreferences = context.getSharedPreferences("LoginPrefs", Context.MODE_PRIVATE)
+
+    var email by remember { mutableStateOf(sharedPreferences.getString("saved_email", "") ?: "") }
+    var password by remember { mutableStateOf(sharedPreferences.getString("saved_password", "") ?: "") }
+    var rememberMe by remember { mutableStateOf(sharedPreferences.getBoolean("remember_me", false)) }
     var showPassword by remember { mutableStateOf(false) }
 
     val currentUser by viewModel.currentUser.collectAsState()
@@ -43,8 +48,25 @@ fun LoginScreen(
 
     LaunchedEffect(currentUser) {
         currentUser?.let { user ->
+            // Save credentials if Remember Me is checked
+            if (rememberMe) {
+                sharedPreferences.edit().apply {
+                    putString("saved_email", email)
+                    putString("saved_password", password)
+                    putBoolean("remember_me", true)
+                    apply()
+                }
+            } else {
+                // Clear saved credentials if Remember Me is unchecked
+                sharedPreferences.edit().clear().apply()
+            }
+
             onLoginSuccess(user.role == "admin")
         }
+    }
+
+    fun performLogin() {
+        viewModel.login(email, password) {}
     }
 
     Box(
@@ -201,7 +223,13 @@ fun LoginScreen(
                         ) {
                             Checkbox(
                                 checked = rememberMe,
-                                onCheckedChange = { rememberMe = it },
+                                onCheckedChange = {
+                                    rememberMe = it
+                                    // Clear saved credentials if unchecked
+                                    if (!it) {
+                                        sharedPreferences.edit().clear().apply()
+                                    }
+                                },
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = GreenPrimary
                                 ),
@@ -240,9 +268,7 @@ fun LoginScreen(
 
                     // Login Button - Compact
                     Button(
-                        onClick = {
-                            viewModel.login(email, password) {}
-                        },
+                        onClick = { performLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
@@ -267,13 +293,12 @@ fun LoginScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
-                                imageVector = Icons.Default.ArrowForward,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Sign In",
                                 modifier = Modifier.size(18.dp)
                             )
                         }
                     }
-
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -294,7 +319,7 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Quick Login Buttons
+                    // Quick Login Buttons - Modified to auto-fill and login
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -304,7 +329,8 @@ fun LoginScreen(
                             onClick = {
                                 email = "admin@company.com"
                                 password = "admin123"
-                                viewModel.login(email, password) {}
+                                // Auto-login after filling
+                                performLogin()
                             },
                             modifier = Modifier
                                 .weight(1f)
@@ -336,7 +362,8 @@ fun LoginScreen(
                             onClick = {
                                 email = "manoj@company.com"
                                 password = "pass123"
-                                viewModel.login(email, password) {}
+                                // Auto-login after filling
+                                performLogin()
                             },
                             modifier = Modifier
                                 .weight(1f)
