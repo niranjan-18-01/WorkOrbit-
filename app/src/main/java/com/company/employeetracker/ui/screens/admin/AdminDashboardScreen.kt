@@ -24,6 +24,8 @@ import com.company.employeetracker.ui.components.EmployeeCard
 import com.company.employeetracker.ui.components.AddReviewDialog
 import com.company.employeetracker.ui.theme.*
 import com.company.employeetracker.viewmodel.*
+import com.company.employeetracker.data.repository.FirebaseRepository
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -40,8 +42,15 @@ fun AdminDashboardScreen(
     val allReviews by reviewViewModel.allReviews.collectAsState()
     val unreadCount by messageViewModel.unreadCount.collectAsState()
 
+    val scope = rememberCoroutineScope()
+    val firebaseRepo = remember { FirebaseRepository() }
+
     LaunchedEffect(Unit) {
         messageViewModel.loadUnreadCount(1)
+        // Force refresh from Firebase
+        scope.launch {
+            employeeViewModel.forceSync()
+        }
     }
 
     val completedTasks = allTasks.count { it.status == "Done" }
@@ -49,15 +58,20 @@ fun AdminDashboardScreen(
     val avgRating =
         if (allReviews.isNotEmpty()) allReviews.map { it.overallRating }.average().toFloat() else 0f
 
-    val topPerformers = allReviews
-        .groupBy { it.employeeId }
-        .mapValues { it.value.map { r -> r.overallRating }.average().toFloat() }
-        .toList()
-        .sortedByDescending { it.second }
-        .take(3)
+    // Top Performers - synced from Firebase reviews
+    val topPerformers = remember(allReviews, employees) {
+        allReviews
+            .groupBy { it.employeeId }
+            .mapValues { it.value.map { r -> r.overallRating }.average().toFloat() }
+            .toList()
+            .sortedByDescending { it.second }
+            .take(3)
+    }
 
+    // Recent Activities - real-time from Firebase
     val recentActivities = remember(employees, allTasks, allReviews) {
         buildList {
+            // New employees
             employees.sortedByDescending { it.joiningDate }.take(2).forEach {
                 add(
                     ActivityItem(
@@ -71,9 +85,10 @@ fun AdminDashboardScreen(
                 )
             }
 
+            // Recently completed tasks
             allTasks.filter { it.status == "Done" }
                 .sortedByDescending { it.deadline }
-                .take(2)
+                .take(3)
                 .forEach {
                     val emp = employees.find { e -> e.id == it.employeeId }
                     add(
@@ -88,20 +103,21 @@ fun AdminDashboardScreen(
                     )
                 }
 
+            // Recent reviews
             allReviews.sortedByDescending { it.date }.take(2).forEach {
                 val emp = employees.find { e -> e.id == it.employeeId }
                 add(
                     ActivityItem(
                         Icons.Default.Star,
                         "Performance Review",
-                        "${emp?.name ?: "Unknown"} rated ${it.overallRating}",
+                        "${emp?.name ?: "Unknown"} rated ${String.format("%.1f", it.overallRating)}",
                         getRelativeTime(it.date),
                         AccentYellow,
                         parseDate(it.date)
                     )
                 )
             }
-        }.sortedByDescending { it.timestamp }
+        }.sortedByDescending { it.timestamp }.take(10)
     }
 
     var showAllActivities by remember { mutableStateOf(false) }
@@ -183,26 +199,28 @@ fun AdminDashboardScreen(
         }
 
         /** TOP PERFORMERS **/
-        item {
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "Top Performers",
-                modifier = Modifier.padding(horizontal = 16.dp),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        if (topPerformers.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Top Performers",
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-        items(topPerformers) { (id, rating) ->
-            val emp = employees.find { it.id == id }
-            emp?.let {
-                Card(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    EmployeeCard(employee = it, rating = rating)
+            items(topPerformers) { (id, rating) ->
+                val emp = employees.find { it.id == id }
+                emp?.let {
+                    Card(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        EmployeeCard(employee = it, rating = rating)
+                    }
                 }
             }
         }
@@ -217,7 +235,7 @@ fun AdminDashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Recent Activities", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                if (recentActivities.size > 3) {
+                if (recentActivities.size > 5) {
                     TextButton(onClick = { showAllActivities = !showAllActivities }) {
                         Text(if (showAllActivities) "Show Less" else "Show All")
                     }
@@ -234,14 +252,29 @@ fun AdminDashboardScreen(
             ) {
                 Column {
                     val list =
-                        if (showAllActivities) recentActivities else recentActivities.take(3)
+                        if (showAllActivities) recentActivities else recentActivities.take(5)
 
-                    list.forEachIndexed { index, activity ->
-                        ActivityItemView(
-                            activity = activity,
-                            highlight = index == 0
-                        )
-                        if (index < list.lastIndex) Divider()
+                    if (list.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No recent activities",
+                                color = Color.Gray,
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        list.forEachIndexed { index, activity ->
+                            ActivityItemView(
+                                activity = activity,
+                                highlight = index == 0
+                            )
+                            if (index < list.lastIndex) Divider()
+                        }
                     }
                 }
             }

@@ -1,5 +1,8 @@
 package com.company.employeetracker.ui.screens.admin
 
+import android.content.Context
+import android.content.Intent
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,14 +20,22 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.company.employeetracker.ui.theme.*
 import com.company.employeetracker.viewmodel.EmployeeViewModel
 import com.company.employeetracker.viewmodel.ReviewViewModel
 import com.company.employeetracker.viewmodel.TaskViewModel
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun AdminAnalyticsScreen(
@@ -32,10 +43,13 @@ fun AdminAnalyticsScreen(
     taskViewModel: TaskViewModel = viewModel(),
     reviewViewModel: ReviewViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val employees by employeeViewModel.employees.collectAsState()
     val allTasks by taskViewModel.allTasks.collectAsState()
     val allReviews by reviewViewModel.allReviews.collectAsState()
     val reviewCount by reviewViewModel.reviewCount.collectAsState()
+
+    var showExportDialog by remember { mutableStateOf(false) }
 
     // Calculate analytics
     val topPerformers = allReviews
@@ -43,7 +57,7 @@ fun AdminAnalyticsScreen(
         .mapValues { entry -> entry.value.map { it.overallRating }.average().toFloat() }
         .toList()
         .sortedByDescending { it.second }
-        .take(3)
+        .take(5)
 
     val departmentEmployeeCounts = employees.groupBy { it.department }.mapValues { it.value.size }
     val totalEmployees = employees.size
@@ -55,22 +69,19 @@ fun AdminAnalyticsScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+            .background(Color(0xFFF8F9FA))
     ) {
         // Header
         item {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                            colors = listOf(IndigoPrimary, IndigoDark)
-                        )
-                    )
-                    .padding(24.dp)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF1E293B),
+                shadowElevation = 4.dp
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -84,14 +95,19 @@ fun AdminAnalyticsScreen(
                         Text(
                             text = "Performance metrics and trends",
                             fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.7f)
                         )
                     }
 
-                    IconButton(onClick = { /* Export */ }) {
+                    IconButton(
+                        onClick = { showExportDialog = true },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.2f)
+                        )
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.BarChart,
-                            contentDescription = "Analytics",
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Export",
                             tint = Color.White
                         )
                     }
@@ -107,10 +123,11 @@ fun AdminAnalyticsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(20.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -118,14 +135,15 @@ fun AdminAnalyticsScreen(
                         Icon(
                             imageVector = Icons.Default.Star,
                             contentDescription = "Top Performers",
-                            tint = AccentYellow,
+                            tint = Color(0xFFFFB020),
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Top Performers",
                             fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
                         )
                     }
 
@@ -151,18 +169,19 @@ fun AdminAnalyticsScreen(
                                             0 -> Color(0xFFFFD700).copy(alpha = 0.2f)
                                             1 -> Color(0xFFC0C0C0).copy(alpha = 0.2f)
                                             2 -> Color(0xFFCD7F32).copy(alpha = 0.2f)
-                                            else -> Color(0xFF9E9E9E).copy(alpha = 0.2f)
+                                            else -> Color(0xFF64748B).copy(alpha = 0.2f)
                                         }
                                     ) {
                                         Text(
                                             text = "#${index + 1}",
                                             modifier = Modifier.padding(8.dp),
                                             fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
                                             color = when (index) {
                                                 0 -> Color(0xFFFFD700)
-                                                1 -> Color(0xFF757575)
+                                                1 -> Color(0xFF94A3B8)
                                                 2 -> Color(0xFFCD7F32)
-                                                else -> Color(0xFF9E9E9E)
+                                                else -> Color(0xFF64748B)
                                             }
                                         )
                                     }
@@ -175,10 +194,10 @@ fun AdminAnalyticsScreen(
                                             .clip(CircleShape)
                                             .background(
                                                 when (it.department) {
-                                                    "Design" -> Color(0xFF9C27B0)
-                                                    "Engineering" -> AccentBlue
-                                                    "Analytics" -> AccentOrange
-                                                    else -> GreenPrimary
+                                                    "Design" -> Color(0xFF8B5CF6)
+                                                    "Engineering" -> Color(0xFF3B82F6)
+                                                    "Analytics" -> Color(0xFFF59E0B)
+                                                    else -> Color(0xFF10B981)
                                                 }
                                             ),
                                         contentAlignment = Alignment.Center
@@ -198,12 +217,13 @@ fun AdminAnalyticsScreen(
                                         Text(
                                             text = it.name,
                                             fontSize = 16.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF1E293B)
                                         )
                                         Text(
                                             text = it.department,
                                             fontSize = 12.sp,
-                                            color = Color(0xFF757575)
+                                            color = Color(0xFF64748B)
                                         )
                                     }
                                 }
@@ -214,87 +234,25 @@ fun AdminAnalyticsScreen(
                                     Icon(
                                         imageVector = Icons.Default.Star,
                                         contentDescription = "Rating",
-                                        tint = AccentYellow,
+                                        tint = Color(0xFFFFB020),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = String.format("%.1f", rating),
                                         fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1E293B)
                                     )
                                 }
                             }
 
                             if (index < topPerformers.size - 1) {
-                                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Employee Ratings Chart
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Employee Ratings",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    employees.take(5).forEach { employee ->
-                        val employeeReviews = allReviews.filter { it.employeeId == employee.id }
-                        val avgRating = if (employeeReviews.isNotEmpty()) {
-                            employeeReviews.map { it.overallRating }.average().toFloat()
-                        } else 0f
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = employee.name,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                LinearProgressIndicator(
-                                    progress = avgRating / 5f,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .padding(top = 4.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = IndigoPrimary,
-                                    trackColor = Color(0xFFE0E0E0)
+                                Divider(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    color = Color(0xFFE2E8F0)
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                text = String.format("%.1f", avgRating),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = IndigoPrimary
-                            )
                         }
                     }
                 }
@@ -309,15 +267,17 @@ fun AdminAnalyticsScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(20.dp)
                 ) {
                     Text(
                         text = "Department Distribution",
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B)
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -326,7 +286,7 @@ fun AdminAnalyticsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp),
+                            .height(220.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         DepartmentPieChart(
@@ -339,12 +299,12 @@ fun AdminAnalyticsScreen(
 
                     // Legend
                     val departmentColors = mapOf(
-                        "Engineering" to AccentBlue,
-                        "Design" to Color(0xFF9C27B0),
-                        "Product" to AccentGreen,
-                        "Marketing" to AccentOrange,
-                        "Analytics" to AccentOrange,
-                        "Others" to AccentRed
+                        "Engineering" to Color(0xFF3B82F6),
+                        "Design" to Color(0xFF8B5CF6),
+                        "Product" to Color(0xFF10B981),
+                        "Marketing" to Color(0xFFF59E0B),
+                        "Analytics" to Color(0xFFEF4444),
+                        "Others" to Color(0xFF64748B)
                     )
 
                     Column(
@@ -362,77 +322,24 @@ fun AdminAnalyticsScreen(
                                             .size(12.dp)
                                             .clip(CircleShape)
                                             .background(
-                                                departmentColors[dept] ?: Color(0xFF757575)
+                                                departmentColors[dept] ?: Color(0xFF64748B)
                                             )
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = dept,
                                         fontSize = 14.sp,
-                                        color = Color(0xFF424242)
+                                        color = Color(0xFF475569)
                                     )
                                 }
                                 Text(
                                     text = "${(count * 100 / totalEmployees)}%",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF212121)
+                                    color = Color(0xFF1E293B)
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
-
-        // Performance Trend
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Performance Trend",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Simple area chart representation
-                    PerformanceTrendChart(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.TrendingUp,
-                            contentDescription = "Trend",
-                            tint = GreenPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "23% increase from last quarter",
-                            fontSize = 14.sp,
-                            color = GreenPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
                     }
                 }
             }
@@ -449,7 +356,7 @@ fun AdminAnalyticsScreen(
             ) {
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEDE7F6)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7)),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(
@@ -460,19 +367,19 @@ fun AdminAnalyticsScreen(
                             text = "$reviewCount",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            color = IndigoPrimary
+                            color = Color(0xFF16A34A)
                         )
                         Text(
                             text = "Total Reviews",
                             fontSize = 12.sp,
-                            color = Color(0xFF757575)
+                            color = Color(0xFF15803D)
                         )
                     }
                 }
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFDEF7EC)),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(
@@ -483,61 +390,13 @@ fun AdminAnalyticsScreen(
                             text = "$completionRate%",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GreenPrimary
+                            color = Color(0xFF047857)
                         )
                         Text(
                             text = "Completion Rate",
                             fontSize = 12.sp,
-                            color = Color(0xFF757575)
+                            color = Color(0xFF065F46)
                         )
-                    }
-                }
-            }
-        }
-
-        // Export Section
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Export Reports",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Download comprehensive analytics",
-                        fontSize = 14.sp,
-                        color = Color(0xFF757575)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = { /* Export */ },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = GreenPrimary
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Download,
-                            contentDescription = "Export"
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -547,6 +406,67 @@ fun AdminAnalyticsScreen(
             Spacer(modifier = Modifier.height(100.dp))
         }
     }
+
+    // Export Dialog
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = null,
+                    tint = GreenPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Export Analytics",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text("Choose export format:")
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            exportAsCSV(context, employees, allTasks, allReviews, topPerformers)
+                            showExportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    ) {
+                        Icon(Icons.Default.TableChart, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Export as CSV")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            exportAsJSON(context, employees, allTasks, allReviews, topPerformers)
+                            showExportDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                    ) {
+                        Icon(Icons.Default.Code, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Export as JSON")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -555,12 +475,12 @@ fun DepartmentPieChart(
     total: Int
 ) {
     val departmentColors = mapOf(
-        "Engineering" to AccentBlue,
-        "Design" to Color(0xFF9C27B0),
-        "Product" to AccentGreen,
-        "Marketing" to AccentOrange,
-        "Analytics" to AccentOrange,
-        "Others" to AccentRed
+        "Engineering" to Color(0xFF3B82F6),
+        "Design" to Color(0xFF8B5CF6),
+        "Product" to Color(0xFF10B981),
+        "Marketing" to Color(0xFFF59E0B),
+        "Analytics" to Color(0xFFEF4444),
+        "Others" to Color(0xFF64748B)
     )
 
     Canvas(modifier = Modifier.size(180.dp)) {
@@ -570,7 +490,7 @@ fun DepartmentPieChart(
 
         data.forEach { (dept, count) ->
             val sweepAngle = (count.toFloat() / total) * 360f
-            val color = departmentColors[dept] ?: Color(0xFF757575)
+            val color = departmentColors[dept] ?: Color(0xFF64748B)
 
             drawArc(
                 color = color,
@@ -589,67 +509,112 @@ fun DepartmentPieChart(
             radius = radius * 0.5f,
             center = center
         )
-
-        // Draw border
-        drawCircle(
-            color = Color(0xFFE0E0E0),
-            radius = radius,
-            center = center,
-            style = Stroke(width = 2.dp.toPx())
-        )
     }
 }
 
-@Composable
-fun PerformanceTrendChart(modifier: Modifier = Modifier) {
-    val data = listOf(2.5f, 3.0f, 2.8f, 3.5f, 4.0f, 3.8f, 4.5f)
+// Export Functions
+private fun exportAsCSV(
+    context: Context,
+    employees: List<com.company.employeetracker.data.database.entities.User>,
+    tasks: List<com.company.employeetracker.data.database.entities.Task>,
+    reviews: List<com.company.employeetracker.data.database.entities.Review>,
+    topPerformers: List<Pair<Int, Float>>
+) {
+    try {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "analytics_export_$timestamp.csv"
+        val file = File(context.getExternalFilesDir(null), fileName)
 
-    Canvas(modifier = modifier.padding(16.dp)) {
-        val spacing = size.width / (data.size - 1)
-        val maxValue = 5f
-        val points = data.mapIndexed { index, value ->
-            Offset(
-                x = index * spacing,
-                y = size.height - (value / maxValue) * size.height
-            )
+        FileWriter(file).use { writer ->
+            // Summary
+            writer.append("ANALYTICS SUMMARY\n")
+            writer.append("Total Employees,${employees.size}\n")
+            writer.append("Total Tasks,${tasks.size}\n")
+            writer.append("Total Reviews,${reviews.size}\n\n")
+
+            // Top Performers
+            writer.append("TOP PERFORMERS\n")
+            writer.append("Rank,Name,Department,Rating\n")
+            topPerformers.forEachIndexed { index, (empId, rating) ->
+                val emp = employees.find { it.id == empId }
+                writer.append("${index + 1},${emp?.name},${emp?.department},${"%.2f".format(rating)}\n")
+            }
+
+            writer.append("\nALL EMPLOYEES\n")
+            writer.append("Name,Email,Department,Designation,Joining Date\n")
+            employees.forEach { emp ->
+                writer.append("${emp.name},${emp.email},${emp.department},${emp.designation},${emp.joiningDate}\n")
+            }
         }
 
-        // Draw area under curve
-        val path = androidx.compose.ui.graphics.Path()
-        path.moveTo(0f, size.height)
-        points.forEach { point ->
-            path.lineTo(point.x, point.y)
-        }
-        path.lineTo(size.width, size.height)
-        path.close()
-
-        drawPath(
-            path = path,
-            color = GreenPrimary.copy(alpha = 0.2f)
-        )
-
-        // Draw line
-        for (i in 0 until points.size - 1) {
-            drawLine(
-                color = GreenPrimary,
-                start = points[i],
-                end = points[i + 1],
-                strokeWidth = 3.dp.toPx()
-            )
-        }
-
-        // Draw points
-        points.forEach { point ->
-            drawCircle(
-                color = GreenPrimary,
-                radius = 6.dp.toPx(),
-                center = point
-            )
-            drawCircle(
-                color = Color.White,
-                radius = 3.dp.toPx(),
-                center = point
-            )
-        }
+        shareFile(context, file)
+    } catch (e: Exception) {
+        android.util.Log.e("Export", "CSV export failed", e)
     }
+}
+
+private fun exportAsJSON(
+    context: Context,
+    employees: List<com.company.employeetracker.data.database.entities.User>,
+    tasks: List<com.company.employeetracker.data.database.entities.Task>,
+    reviews: List<com.company.employeetracker.data.database.entities.Review>,
+    topPerformers: List<Pair<Int, Float>>
+) {
+    try {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "analytics_export_$timestamp.json"
+        val file = File(context.getExternalFilesDir(null), fileName)
+
+        val json = JSONObject().apply {
+            put("exportDate", timestamp)
+            put("summary", JSONObject().apply {
+                put("totalEmployees", employees.size)
+                put("totalTasks", tasks.size)
+                put("totalReviews", reviews.size)
+            })
+
+            put("topPerformers", JSONArray().apply {
+                topPerformers.forEach { (empId, rating) ->
+                    val emp = employees.find { it.id == empId }
+                    put(JSONObject().apply {
+                        put("name", emp?.name)
+                        put("department", emp?.department)
+                        put("rating", rating)
+                    })
+                }
+            })
+
+            put("employees", JSONArray().apply {
+                employees.forEach { emp ->
+                    put(JSONObject().apply {
+                        put("name", emp.name)
+                        put("email", emp.email)
+                        put("department", emp.department)
+                        put("designation", emp.designation)
+                    })
+                }
+            })
+        }
+
+        FileWriter(file).use { it.write(json.toString(2)) }
+        shareFile(context, file)
+    } catch (e: Exception) {
+        android.util.Log.e("Export", "JSON export failed", e)
+    }
+}
+
+private fun shareFile(context: Context, file: File) {
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
+
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = if (file.name.endsWith(".csv")) "text/csv" else "application/json"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    context.startActivity(Intent.createChooser(intent, "Share Analytics"))
 }

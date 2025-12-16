@@ -61,7 +61,12 @@ fun AdminEmployeesScreen(
     if (selectedEmployee != null) {
         EmployeeDetailScreen(
             employee = selectedEmployee!!,
-            onBackClick = { selectedEmployee = null }
+            employees = employees,
+            onBackClick = { selectedEmployee = null },
+            onDeleteEmployee = { employee ->
+                employeeViewModel.deleteEmployee(employee)
+                selectedEmployee = null
+            }
         )
         return
     }

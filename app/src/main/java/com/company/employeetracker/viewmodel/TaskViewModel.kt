@@ -102,17 +102,33 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     fun updateTaskStatus(taskId: Int, newStatus: String) {
         viewModelScope.launch {
             try {
+                // Get the task first
                 val task = taskDao.getTaskById(taskId)
-                task?.let {
-                    val updatedTask = it.copy(status = newStatus)
+                if (task != null) {
+                    // Create updated task with new status
+                    val updatedTask = task.copy(status = newStatus)
+
+                    // Update in Firebase (this will trigger the flow and update UI)
                     firebaseRepo.updateTask(updatedTask)
+
+                    // Also update local database immediately for offline support
+                    taskDao.updateTask(updatedTask)
+
+                    android.util.Log.d("TaskViewModel", "Updated task $taskId to status: $newStatus")
+                } else {
+                    android.util.Log.e("TaskViewModel", "Task $taskId not found")
                 }
             } catch (e: Exception) {
-                // Fallback to local database
-                val task = taskDao.getTaskById(taskId)
-                task?.let {
-                    val updatedTask = it.copy(status = newStatus)
-                    taskDao.updateTask(updatedTask)
+                android.util.Log.e("TaskViewModel", "Error updating task status", e)
+                // Fallback: try local database only
+                try {
+                    val task = taskDao.getTaskById(taskId)
+                    task?.let {
+                        val updatedTask = it.copy(status = newStatus)
+                        taskDao.updateTask(updatedTask)
+                    }
+                } catch (localError: Exception) {
+                    android.util.Log.e("TaskViewModel", "Local update also failed", localError)
                 }
             }
         }
