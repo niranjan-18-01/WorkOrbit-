@@ -26,8 +26,10 @@ import com.company.employeetracker.ui.theme.*
 import com.company.employeetracker.viewmodel.AttendanceViewModel
 import com.company.employeetracker.viewmodel.ReviewViewModel
 import com.company.employeetracker.viewmodel.TaskViewModel
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +52,6 @@ fun EmployeeDetailScreen(
     }
 
     val tasks by taskViewModel.employeeTasks.collectAsState()
-    // val reviews by reviewViewModel.employeeReviews.collectAsState() // Removed unused variable
     val attendance by attendanceViewModel.employeeAttendance.collectAsState()
     val averageRating by reviewViewModel.averageRating.collectAsState()
 
@@ -136,7 +137,7 @@ fun EmployeeDetailScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Employee Name (Large)
+                    // Employee Name
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -325,7 +326,7 @@ fun EmployeeDetailScreen(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Mark Attendance"
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Mark Attendance",
                     fontSize = 16.sp,
@@ -334,10 +335,10 @@ fun EmployeeDetailScreen(
             }
         }
 
-        // GitHub-style Attendance Calendar
+        // Monthly Attendance Calendar
         item {
             Spacer(modifier = Modifier.height(24.dp))
-            AttendanceCalendar(
+            MonthlyAttendanceCalendar(
                 attendance = attendance,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -351,18 +352,16 @@ fun EmployeeDetailScreen(
     // Mark Attendance Dialog
     if (showMarkAttendanceDialog) {
         MarkAttendanceDialog(
-            selectedEmployee = employee,
-            defaultCheckIn = defaultCheckIn,
-            defaultCheckOut = defaultCheckOut,
+            employee = employee,
             onDismiss = { showMarkAttendanceDialog = false },
-            onAttendanceMarked = { attendanceItem: Attendance ->
+            onAttendanceMarked = { attendanceItem ->
                 attendanceViewModel.markAttendance(attendanceItem)
                 showMarkAttendanceDialog = false
             }
         )
     }
 
-    // Delete Confirmation Dialog
+    // Delete Confirmation Dialog - FIXED
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -386,9 +385,8 @@ fun EmployeeDetailScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        onDeleteEmployee(employee)
+                        onDeleteEmployee(employee) // This now properly calls the delete function
                         showDeleteDialog = false
-                        onBackClick()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
                 ) {
@@ -405,12 +403,12 @@ fun EmployeeDetailScreen(
 }
 
 @Composable
-fun AttendanceCalendar(
+fun MonthlyAttendanceCalendar(
     attendance: List<Attendance>,
     modifier: Modifier = Modifier
 ) {
     val currentMonth = remember { YearMonth.now() }
-    val startDate = currentMonth.minusMonths(2).atDay(1)
+    val startDate = currentMonth.atDay(1)
     val endDate = currentMonth.atEndOfMonth()
 
     // Create attendance map by date
@@ -429,11 +427,18 @@ fun AttendanceCalendar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Attendance History",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = "Attendance - ${currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy"))}",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${attendance.count { it.status == "Present" }} days present",
+                        fontSize = 12.sp,
+                        color = Color(0xFF757575)
+                    )
+                }
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = null,
@@ -448,11 +453,12 @@ fun AttendanceCalendar(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
+                listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach { day ->
                     Text(
                         text = day,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         color = Color.Gray,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
                         textAlign = TextAlign.Center
                     )
@@ -462,8 +468,9 @@ fun AttendanceCalendar(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Calendar grid
-            var currentDate = startDate
-            while (!currentDate.isAfter(endDate)) {
+            var currentDate = startDate.minusDays(startDate.dayOfWeek.value.toLong() % 7)
+
+            while (currentDate.isBefore(endDate.plusDays(1))) {
                 val weekStart = currentDate
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -471,36 +478,46 @@ fun AttendanceCalendar(
                 ) {
                     for (i in 0..6) {
                         val date = weekStart.plusDays(i.toLong())
-                        if (date.isBefore(startDate) || date.isAfter(endDate)) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        } else {
-                            val dateStr = date.toString()
-                            val record = attendanceMap[dateStr]
-                            val color = when (record?.status) {
-                                "Present" -> GreenPrimary
-                                "Absent" -> AccentRed
-                                "Half Day" -> AccentOrange
-                                "Leave" -> AccentBlue
-                                else -> Color(0xFFEEEEEE)
-                            }
+                        val dateStr = date.toString()
+                        val record = attendanceMap[dateStr]
+                        val isCurrentMonth = date.month == currentMonth.month
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .padding(2.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(color)
-                                    .then(
-                                        if (record != null) {
-                                            Modifier.border(
-                                                1.dp,
-                                                color.copy(alpha = 0.3f),
-                                                RoundedCornerShape(4.dp)
-                                            )
-                                        } else Modifier
-                                    )
-                            )
+                        val color = when {
+                            !isCurrentMonth -> Color.Transparent
+                            record?.status == "Present" -> GreenPrimary
+                            record?.status == "Absent" -> AccentRed
+                            record?.status == "Half Day" -> AccentOrange
+                            record?.status == "Leave" -> AccentBlue
+                            date.isAfter(LocalDate.now()) -> Color(0xFFF5F5F5)
+                            else -> Color(0xFFEEEEEE)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .padding(2.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(color)
+                                .then(
+                                    if (date == LocalDate.now()) {
+                                        Modifier.border(
+                                            2.dp,
+                                            GreenPrimary,
+                                            RoundedCornerShape(6.dp)
+                                        )
+                                    } else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isCurrentMonth) {
+                                Text(
+                                    text = date.dayOfMonth.toString(),
+                                    fontSize = 10.sp,
+                                    fontWeight = if (record != null) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (record != null) Color.White else Color(0xFF424242)
+                                )
+                            }
                         }
                     }
                 }
@@ -561,35 +578,124 @@ fun InfoRow(label: String, value: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MarkAttendanceDialog(
-    selectedEmployee: User,
-    defaultCheckIn: LocalTime,
-    defaultCheckOut: LocalTime,
+    employee: User,
     onDismiss: () -> Unit,
     onAttendanceMarked: (Attendance) -> Unit
 ) {
+    val today = LocalDate.now()
+    var selectedStatus by remember { mutableStateOf("Present") }
+    var checkInTime by remember { mutableStateOf("09:00") }
+    var checkOutTime by remember { mutableStateOf("18:00") }
+    var remarks by remember { mutableStateOf("") }
+
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Mark Attendance") },
-        text = { Text("This is a placeholder for the Mark Attendance Dialog.") },
-        confirmButton = {
-            Button(onClick = {
-                // Placeholder action: create a dummy attendance record
-                val dummyAttendance = Attendance(
-                    employeeId = selectedEmployee.id,
-                    date = java.time.LocalDate.now().toString(),
-                    status = "Present",
-                    checkInTime = defaultCheckIn.toString(),
-                    checkOutTime = defaultCheckOut.toString()
+        onDismissRequest = onDismiss
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text(
+                    text = "Mark Attendance",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                onAttendanceMarked(dummyAttendance)
-            }) {
-                Text("Mark Present (Dummy)")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "${employee.name} • ${today.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}",
+                    fontSize = 14.sp,
+                    color = Color(0xFF757575)
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Status Selection
+                Text("Status", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Present", "Absent", "Half Day", "Leave").forEach { status ->
+                        FilterChip(
+                            selected = selectedStatus == status,
+                            onClick = { selectedStatus = status },
+                            label = { Text(status, fontSize = 12.sp) }
+                        )
+                    }
+                }
+
+                if (selectedStatus == "Present" || selectedStatus == "Half Day") {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = checkInTime,
+                        onValueChange = { checkInTime = it },
+                        label = { Text("Check In") },
+                        leadingIcon = { Icon(Icons.Default.AccessTime, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = checkOutTime,
+                        onValueChange = { checkOutTime = it },
+                        label = { Text("Check Out") },
+                        leadingIcon = { Icon(Icons.Default.AccessTime, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = remarks,
+                    onValueChange = { remarks = it },
+                    label = { Text("Remarks (Optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Button(
+                        onClick = {
+                            val attendance = Attendance(
+                                employeeId = employee.id,
+                                date = today.toString(),
+                                checkInTime = if (selectedStatus == "Present" || selectedStatus == "Half Day") checkInTime else "",
+                                checkOutTime = if (selectedStatus == "Present" || selectedStatus == "Half Day") checkOutTime else null,
+                                status = selectedStatus,
+                                remarks = remarks,
+                                markedBy = "Admin"
+                            )
+                            onAttendanceMarked(attendance)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                    ) {
+                        Text("Mark")
+                    }
+                }
             }
         }
-    )
+    }
 }
