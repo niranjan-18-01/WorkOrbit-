@@ -1,8 +1,11 @@
+// AdminTasksScreen.kt - Enhanced with Delete Functionality
+
 package com.company.employeetracker.ui.screens.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,28 +16,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.company.employeetracker.ui.components.TaskCard
-import com.company.employeetracker.ui.theme.*
-import com.company.employeetracker.viewmodel.TaskViewModel
+import com.company.employeetracker.data.database.entities.Task
 import com.company.employeetracker.ui.components.AddTaskDialog
 import com.company.employeetracker.ui.components.EmptyStateScreen
-import kotlinx.coroutines.delay
 import com.company.employeetracker.ui.components.LoadingScreen
- import androidx.compose.foundation.lazy.LazyRow
- import androidx.compose.foundation.rememberScrollState
- import androidx.compose.foundation.horizontalScroll
- import androidx.compose.ui.text.style.TextOverflow
-
+import com.company.employeetracker.ui.theme.*
+import com.company.employeetracker.viewmodel.EmployeeViewModel
+import com.company.employeetracker.viewmodel.TaskViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AdminTasksScreen(
-    taskViewModel: TaskViewModel = viewModel()
+    taskViewModel: TaskViewModel = viewModel(),
+    employeeViewModel: EmployeeViewModel = viewModel()
 ) {
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         delay(800)
@@ -47,6 +51,7 @@ fun AdminTasksScreen(
     }
 
     val allTasks by taskViewModel.allTasks.collectAsState()
+    val employees by employeeViewModel.employees.collectAsState()
     val pendingCount by taskViewModel.pendingCount.collectAsState()
     val activeCount by taskViewModel.activeCount.collectAsState()
     val completedCount by taskViewModel.completedCount.collectAsState()
@@ -56,7 +61,7 @@ fun AdminTasksScreen(
     val filteredTasks = when (selectedFilter) {
         "High Priority" -> allTasks.filter { it.priority == "High" || it.priority == "Critical" }
         "Due Today" -> allTasks.filter { it.deadline == java.time.LocalDate.now().toString() }
-        "My Tasks" -> allTasks // Would filter by current admin
+        "My Tasks" -> allTasks
         else -> allTasks
     }
 
@@ -233,9 +238,7 @@ fun AdminTasksScreen(
                         Column(
                             modifier = Modifier.padding(20.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Assignment,
                                     contentDescription = "Tasks",
@@ -267,9 +270,7 @@ fun AdminTasksScreen(
                         Column(
                             modifier = Modifier.padding(20.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.TrendingUp,
                                     contentDescription = "Completion",
@@ -295,10 +296,9 @@ fun AdminTasksScreen(
                 }
             }
 
-            // Filter Chips (horizontal scroll)
+            // Filter Chips
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-
                 val filters = listOf("All", "High Priority", "Due Today", "My Tasks")
 
                 LazyRow(
@@ -320,9 +320,8 @@ fun AdminTasksScreen(
                                     fontSize = 14.sp
                                 )
                             },
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = 40.dp) // keeps chip height consistent
-                            , colors = FilterChipDefaults.filterChipColors(
+                            modifier = Modifier.defaultMinSize(minHeight = 40.dp),
+                            colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = PurplePrimary,
                                 selectedLabelColor = Color.White
                             )
@@ -330,7 +329,8 @@ fun AdminTasksScreen(
                     }
                 }
             }
-            // Empty State for filters
+
+            // Empty State
             if (filteredTasks.isEmpty()) {
                 item {
                     EmptyStateScreen(
@@ -343,142 +343,70 @@ fun AdminTasksScreen(
                     )
                 }
             } else {
-                // Pending Tasks Section
+                // Pending Tasks
                 if (filteredTasks.any { it.status == "Pending" }) {
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Timer,
-                                contentDescription = "Pending",
-                                tint = AccentRed,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Pending Tasks",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = AccentRed.copy(alpha = 0.1f)
-                            ) {
-                                Text(
-                                    text = "${filteredTasks.count { it.status == "Pending" }}",
-                                    color = AccentRed,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        TaskSectionHeader(
+                            title = "Pending Tasks",
+                            count = filteredTasks.count { it.status == "Pending" },
+                            color = AccentRed,
+                            icon = Icons.Default.Timer
+                        )
                     }
 
                     items(filteredTasks.filter { it.status == "Pending" }) { task ->
                         Spacer(modifier = Modifier.height(12.dp))
-                        TaskCard(
+                        TaskCardWithDelete(
                             task = task,
+                            employeeName = employees.find { it.id == task.employeeId }?.name ?: "Unknown",
+                            onDeleteClick = { taskToDelete = task },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }
 
-                // In Progress Tasks Section
+                // Active Tasks
                 if (filteredTasks.any { it.status == "Active" }) {
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "In Progress",
-                                tint = AccentBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "In Progress",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = AccentBlue.copy(alpha = 0.1f)
-                            ) {
-                                Text(
-                                    text = "${filteredTasks.count { it.status == "Active" }}",
-                                    color = AccentBlue,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        TaskSectionHeader(
+                            title = "In Progress",
+                            count = filteredTasks.count { it.status == "Active" },
+                            color = AccentBlue,
+                            icon = Icons.Default.Refresh
+                        )
                     }
 
                     items(filteredTasks.filter { it.status == "Active" }) { task ->
                         Spacer(modifier = Modifier.height(12.dp))
-                        TaskCard(
+                        TaskCardWithDelete(
                             task = task,
+                            employeeName = employees.find { it.id == task.employeeId }?.name ?: "Unknown",
+                            onDeleteClick = { taskToDelete = task },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
                 }
 
-                // Completed Tasks Section
+                // Completed Tasks
                 if (filteredTasks.any { it.status == "Done" }) {
                     item {
                         Spacer(modifier = Modifier.height(24.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Completed",
-                                tint = GreenPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Completed",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = GreenPrimary.copy(alpha = 0.1f)
-                            ) {
-                                Text(
-                                    text = "${filteredTasks.count { it.status == "Done" }}",
-                                    color = GreenPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        TaskSectionHeader(
+                            title = "Completed",
+                            count = filteredTasks.count { it.status == "Done" },
+                            color = GreenPrimary,
+                            icon = Icons.Default.CheckCircle
+                        )
                     }
 
                     items(filteredTasks.filter { it.status == "Done" }.take(5)) { task ->
                         Spacer(modifier = Modifier.height(12.dp))
-                        TaskCard(
+                        TaskCardWithDelete(
                             task = task,
+                            employeeName = employees.find { it.id == task.employeeId }?.name ?: "Unknown",
+                            onDeleteClick = { taskToDelete = task },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -495,9 +423,290 @@ fun AdminTasksScreen(
     if (showAddTaskDialog) {
         AddTaskDialog(
             onDismiss = { showAddTaskDialog = false },
-            onTaskAdded = {
-                // Task added successfully
+            onTaskAdded = {}
+        )
+    }
+
+    // Delete Task Dialog
+    if (taskToDelete != null) {
+        DeleteTaskDialog(
+            task = taskToDelete!!,
+            employeeName = employees.find { it.id == taskToDelete!!.employeeId }?.name ?: "Unknown",
+            onDismiss = { taskToDelete = null },
+            onConfirmDelete = {
+                scope.launch {
+                    taskViewModel.deleteTask(taskToDelete!!.id)
+                    taskToDelete = null
+                }
             }
         )
     }
+}
+
+@Composable
+private fun TaskSectionHeader(
+    title: String,
+    count: Int,
+    color: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = color,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = color.copy(alpha = 0.1f)
+        ) {
+            Text(
+                text = "$count",
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskCardWithDelete(
+    task: Task,
+    employeeName: String,
+    onDeleteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val statusColor = when (task.status) {
+        "Done" -> GreenPrimary
+        "Active" -> AccentOrange
+        "Pending" -> AccentRed
+        else -> Color.Gray
+    }
+
+    val priorityColor = when (task.priority) {
+        "High", "Critical" -> AccentRed
+        "Medium" -> AccentOrange
+        "Low" -> AccentBlue
+        else -> Color.Gray
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = task.title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF212121)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = task.description,
+                        fontSize = 13.sp,
+                        color = Color(0xFF757575),
+                        maxLines = 2
+                    )
+                }
+
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = AccentRed,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Assigned To
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Assigned",
+                    tint = Color(0xFF757575),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = employeeName,
+                    fontSize = 13.sp,
+                    color = Color(0xFF757575)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Footer
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = priorityColor.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = task.priority,
+                            color = priorityColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = "Deadline",
+                        tint = Color(0xFF757575),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = task.deadline,
+                        fontSize = 12.sp,
+                        color = Color(0xFF757575)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = statusColor.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = task.status,
+                        color = statusColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeleteTaskDialog(
+    task: Task,
+    employeeName: String,
+    onDismiss: () -> Unit,
+    onConfirmDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = AccentRed,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = {
+            Text(
+                text = "Delete Task?",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Column {
+                Text("You are about to permanently delete this task:")
+
+                Spacer(Modifier.height(12.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = AccentRed.copy(alpha = 0.05f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = task.title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Assigned to: $employeeName",
+                            fontSize = 13.sp,
+                            color = Color(0xFF757575)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Priority: ${task.priority} • Deadline: ${task.deadline}",
+                            fontSize = 12.sp,
+                            color = Color(0xFF757575)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "This action cannot be undone!",
+                    fontSize = 13.sp,
+                    color = AccentRed,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirmDelete,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Delete", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }

@@ -552,4 +552,59 @@ class FirebaseRepository {
         attendanceRef.addValueEventListener(listener)
         awaitClose { attendanceRef.removeEventListener(listener) }
     }
+
+    // Add this method to FirebaseRepository.kt class
+
+    /**
+     * Cascade delete: Deletes employee and ALL related data from Firebase
+     */
+    suspend fun deleteEmployeeCascade(employeeId: Int): Result<Unit> {
+        return try {
+            android.util.Log.d(tag, "Starting cascade delete for employee: $employeeId")
+
+            // 1. Delete all tasks for this employee
+            val tasksSnapshot = tasksRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
+            tasksSnapshot.children.forEach { taskSnapshot ->
+                taskSnapshot.ref.removeValue().await()
+                android.util.Log.d(tag, "Deleted task: ${taskSnapshot.key}")
+            }
+
+            // 2. Delete all reviews for this employee
+            val reviewsSnapshot = reviewsRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
+            reviewsSnapshot.children.forEach { reviewSnapshot ->
+                reviewSnapshot.ref.removeValue().await()
+                android.util.Log.d(tag, "Deleted review: ${reviewSnapshot.key}")
+            }
+
+            // 3. Delete all messages sent by or to this employee
+            val messagesSentSnapshot = messagesRef.orderByChild("senderId").equalTo(employeeId.toDouble()).get().await()
+            messagesSentSnapshot.children.forEach { messageSnapshot ->
+                messageSnapshot.ref.removeValue().await()
+                android.util.Log.d(tag, "Deleted sent message: ${messageSnapshot.key}")
+            }
+
+            val messagesReceivedSnapshot = messagesRef.orderByChild("receiverId").equalTo(employeeId.toDouble()).get().await()
+            messagesReceivedSnapshot.children.forEach { messageSnapshot ->
+                messageSnapshot.ref.removeValue().await()
+                android.util.Log.d(tag, "Deleted received message: ${messageSnapshot.key}")
+            }
+
+            // 4. Delete all attendance records for this employee
+            val attendanceSnapshot = attendanceRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
+            attendanceSnapshot.children.forEach { attSnapshot ->
+                attSnapshot.ref.removeValue().await()
+                android.util.Log.d(tag, "Deleted attendance: ${attSnapshot.key}")
+            }
+
+            // 5. Finally, delete the employee user record
+            usersRef.child(employeeId.toString()).removeValue().await()
+            android.util.Log.d(tag, "Deleted employee user record: $employeeId")
+
+            android.util.Log.d(tag, "✅ Successfully completed cascade delete for employee: $employeeId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e(tag, "❌ Error in cascade delete for employee $employeeId: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }

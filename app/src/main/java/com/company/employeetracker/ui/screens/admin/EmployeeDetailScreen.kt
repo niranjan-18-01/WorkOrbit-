@@ -361,7 +361,7 @@ fun EmployeeDetailScreen(
         )
     }
 
-    // Delete Confirmation Dialog - FIXED
+    // Delete Confirmation Dialog - FIXED WITH PROPER CALLBACK
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -380,17 +380,43 @@ fun EmployeeDetailScreen(
                 )
             },
             text = {
-                Text("Are you sure you want to delete ${employee.name}? This action cannot be undone and will remove all associated tasks, reviews, and attendance records.")
+                Column {
+                    Text("Are you sure you want to delete ${employee.name}?")
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "This will also permanently delete:",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("• All assigned tasks", fontSize = 13.sp)
+                        Text("• Performance reviews", fontSize = 13.sp)
+                        Text("• Attendance records", fontSize = 13.sp)
+                        Text("• Message history", fontSize = 13.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "This action cannot be undone!",
+                        color = AccentRed,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        onDeleteEmployee(employee) // This now properly calls the delete function
+                        android.util.Log.d("EmployeeDetail", "Deleting employee: ${employee.name} (ID: ${employee.id})")
+                        onDeleteEmployee(employee) // This now properly triggers deletion
                         showDeleteDialog = false
+                        onBackClick() // Navigate back after deletion
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
                 ) {
-                    Text("Delete")
+                    Icon(Icons.Default.Delete, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete Permanently")
                 }
             },
             dismissButton = {
