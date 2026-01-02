@@ -610,9 +610,17 @@ fun MarkAttendanceDialog(
 ) {
     val today = LocalDate.now()
     var selectedStatus by remember { mutableStateOf("Present") }
-    var checkInTime by remember { mutableStateOf("09:00") }
-    var checkOutTime by remember { mutableStateOf("18:00") }
     var remarks by remember { mutableStateOf("") }
+    var showCheckInPicker by remember { mutableStateOf(false) }
+    var showCheckOutPicker by remember { mutableStateOf(false) }
+    val isAmPmEnabled = true
+
+    val defaultCheckIn = if (isAmPmEnabled) "09:00 AM" else "09:00"
+    val defaultCheckOut = if (isAmPmEnabled) "06:00 PM" else "18:00"
+
+    var checkInTime by remember { mutableStateOf(defaultCheckIn) }
+    var checkOutTime by remember { mutableStateOf(defaultCheckOut) }
+
 
     AlertDialog(
         onDismissRequest = onDismiss
@@ -648,7 +656,20 @@ fun MarkAttendanceDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Present", "Absent", "Half Day", "Leave").forEach { status ->
+                    listOf("Present", "Absent").forEach { status ->
+                        FilterChip(
+                            selected = selectedStatus == status,
+                            onClick = { selectedStatus = status },
+                            label = { Text(status, fontSize = 12.sp) }
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Half Day", "Leave").forEach { status ->
                         FilterChip(
                             selected = selectedStatus == status,
                             onClick = { selectedStatus = status },
@@ -662,21 +683,35 @@ fun MarkAttendanceDialog(
 
                     OutlinedTextField(
                         value = checkInTime,
-                        onValueChange = { checkInTime = it },
-                        label = { Text("Check In") },
-                        leadingIcon = { Icon(Icons.Default.AccessTime, null) },
-                        modifier = Modifier.fillMaxWidth()
+                        onValueChange = {},
+                        label = { Text("Check In Time") },
+                        readOnly = true,
+                        leadingIcon = {
+                            IconButton(onClick = { showCheckInPicker = true }) {
+                                Icon(Icons.Default.AccessTime, contentDescription = "Pick Check In Time")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
+
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedTextField(
                         value = checkOutTime,
-                        onValueChange = { checkOutTime = it },
-                        label = { Text("Check Out") },
-                        leadingIcon = { Icon(Icons.Default.AccessTime, null) },
-                        modifier = Modifier.fillMaxWidth()
+                        onValueChange = {},
+                        label = { Text("Check Out Time") },
+                        readOnly = true,
+                        leadingIcon = {
+                            IconButton(onClick = { showCheckOutPicker = true }) {
+                                Icon(Icons.Default.AccessTime, contentDescription = "Pick Check Out Time")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
+
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -724,4 +759,78 @@ fun MarkAttendanceDialog(
             }
         }
     }
+    if (showCheckInPicker) {
+        TimePickerDialog(
+            initialTime = checkInTime,
+            isAmPmEnabled = isAmPmEnabled,
+            onTimeSelected = {
+                checkInTime = it
+                showCheckInPicker = false
+            },
+            onDismiss = { showCheckInPicker = false }
+        )
+    }
+
+    if (showCheckOutPicker) {
+        TimePickerDialog(
+            initialTime = checkOutTime,
+            isAmPmEnabled = isAmPmEnabled,
+            onTimeSelected = {
+                checkOutTime = it
+                showCheckOutPicker = false
+            },
+            onDismiss = { showCheckOutPicker = false }
+        )
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimePickerDialog(
+    initialTime: String,
+    isAmPmEnabled: Boolean,
+    onTimeSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val formatter = if (isAmPmEnabled) {
+        DateTimeFormatter.ofPattern("hh:mm a")
+    } else {
+        DateTimeFormatter.ofPattern("HH:mm")
+    }
+
+    val localTime = try {
+        LocalTime.parse(initialTime, formatter)
+    } catch (e: Exception) {
+        LocalTime.of(9, 0)
+    }
+
+    val timePickerState = rememberTimePickerState(
+        initialHour = localTime.hour,
+        initialMinute = localTime.minute,
+        is24Hour = !isAmPmEnabled
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedTime = LocalTime.of(
+                        timePickerState.hour,
+                        timePickerState.minute
+                    )
+                    onTimeSelected(selectedTime.format(formatter))
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        text = {
+            TimePicker(state = timePickerState)
+        }
+    )
 }

@@ -194,26 +194,33 @@ fun AdminEmployeesScreen(
                 item {
                     Spacer(Modifier.height(16.dp))
                     Row(
-                        Modifier
-                            .padding(horizontal = 16.dp)
-                            .fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        StatMiniCard(
-                            value = filteredEmployees.size.toString(),
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.People,
+                            value = "(${filteredEmployees.size})",
                             label = "Total",
                             color = AccentBlue
                         )
-                        StatMiniCard(
-                            value = activeEmployees.toString(),
+
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.CheckCircle,
+                            value = "5",
                             label = "Active",
                             color = GreenPrimary
                         )
-                        StatMiniCard(
-                            value = String.format("%.1f", avgRating),
+
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Star,
+                            value = "4.3",
                             label = "Rating",
-                            color = AccentYellow,
-                            icon = Icons.Default.Star
+                            color = AccentYellow
                         )
                     }
                 }

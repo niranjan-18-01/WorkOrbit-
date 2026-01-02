@@ -145,7 +145,7 @@ fun AdminDashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
-                ) {
+                ){
                     Column {
                         Text("Welcome Back", color = Color.White, fontSize = 14.sp)
                         Text(

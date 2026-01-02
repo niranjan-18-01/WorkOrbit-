@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
 @Composable
 fun StatCard(
     icon: ImageVector,
@@ -23,35 +22,47 @@ fun StatCard(
 ) {
     Card(
         modifier = modifier
-            .height(120.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .height(96.dp),
+        shape = RoundedCornerShape(20.dp), // ✅ rounded corners
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface // ✅ flat surface
+        ),
+        elevation = CardDefaults.cardElevation(0.dp) // ❌ no outer shadow
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.Start
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = color,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = value,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
+
+            /* ICON + VALUE */
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = color,
+                    modifier = Modifier.size(26.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = value,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            }
+
+            /* LABEL */
             Text(
                 text = label,
-                fontSize = 12.sp,
-                color = Color.Gray
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
