@@ -18,14 +18,7 @@ import com.company.employeetracker.ui.components.EmployeeBottomNavBar
 import com.company.employeetracker.ui.screens.admin.*
 import com.company.employeetracker.ui.screens.auth.LoginScreen
 import com.company.employeetracker.ui.screens.auth.ForgotPasswordScreen
-import com.company.employeetracker.ui.screens.admin.AdminProfileScreen
-import com.company.employeetracker.ui.screens.employee.EmployeeHomeScreen
-import com.company.employeetracker.ui.screens.employee.EmployeeProfileScreen
-import com.company.employeetracker.ui.screens.employee.EmployeeReviewsScreen
-import com.company.employeetracker.ui.screens.employee.EmployeeTasksScreen
-import com.company.employeetracker.ui.screens.employee.NotificationsScreen
-import com.company.employeetracker.ui.screens.employee.ChatScreen
-import com.company.employeetracker.ui.screens.employee.SelectEmployeeScreen
+import com.company.employeetracker.ui.screens.employee.*
 import com.company.employeetracker.ui.theme.EmployeeTrackerTheme
 import com.company.employeetracker.viewmodel.AuthViewModel
 import com.google.firebase.database.FirebaseDatabase
@@ -46,7 +39,7 @@ class MainActivity : ComponentActivity() {
             Log.e("Firebase", "❌ Connection failed: ${it.message}")
         }
 
-        // Initialize Firebase (if not already initialized)
+        // Initialize Firebase
         try {
             FirebaseDatabase.getInstance().setPersistenceEnabled(true)
         } catch (e: Exception) {
@@ -76,7 +69,12 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
     val isAdmin = currentUser?.role == "admin"
 
     // Show bottom bar only when logged in and not on login or forgot password screens
-    val showBottomBar = currentUser != null && currentRoute != "login" && currentRoute != "forgot_password"
+    val showBottomBar = currentUser != null &&
+            currentRoute != "login" &&
+            currentRoute != "forgot_password" &&
+            !currentRoute.orEmpty().startsWith("chat/") &&
+            currentRoute != "notifications" &&
+            currentRoute != "select_employee"
 
     Scaffold(
         bottomBar = {
@@ -151,11 +149,14 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
                         currentUser = user,
                         onNavigateToSelectEmployee = {
                             navController.navigate("select_employee")
+                        },
+                        onNavigateToNotifications = {
+                            // FIXED: Navigate to notifications screen
+                            navController.navigate("notifications")
                         }
                     )
                 }
             }
-
 
             composable("tasks") {
                 currentUser?.let { user ->
@@ -189,13 +190,14 @@ fun EmployeeTrackerApp(authViewModel: AuthViewModel) {
                 }
             }
 
-            // Notifications Screen
+            // FIXED: Notifications Screen with message click handler
             composable("notifications") {
                 currentUser?.let { user ->
                     NotificationsScreen(
                         currentUser = user,
                         onBackClick = { navController.popBackStack() },
                         onMessageClick = { userId ->
+                            // Navigate to chat screen when message is clicked
                             navController.navigate("chat/$userId")
                         }
                     )

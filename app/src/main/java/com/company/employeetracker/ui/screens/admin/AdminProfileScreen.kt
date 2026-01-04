@@ -461,3 +461,51 @@ fun AdminProfileScreen(
         }
     }
 }
+
+// Edit Profile Dialog
+@Composable
+fun EditProfileDialog(
+    currentUser: User,
+    onDismiss: () -> Unit,
+    onSave: (User) -> Unit
+) {
+    var name by remember { mutableStateOf(currentUser.name) }
+    var contact by remember { mutableStateOf(currentUser.contact) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Profile") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") }
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = contact,
+                    onValueChange = { contact = it },
+                    label = { Text("Contact") }
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val updatedUser = currentUser.copy(
+                    name = name,
+                    contact = contact
+                )
+                onSave(updatedUser)
+                onDismiss()
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}

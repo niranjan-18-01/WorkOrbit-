@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.company.employeetracker.data.database.entities.User
 import com.company.employeetracker.ui.components.TaskCard
 import com.company.employeetracker.ui.theme.*
@@ -33,6 +35,7 @@ fun EmployeeHomeScreen(
     currentUser: User,
     onTaskClick: (Int) -> Unit = {},
     onNavigateToSelectEmployee: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     taskViewModel: TaskViewModel = viewModel(),
     reviewViewModel: ReviewViewModel = viewModel(),
     messageViewModel: MessageViewModel = viewModel()
@@ -165,20 +168,30 @@ fun EmployeeHomeScreen(
                                 }
                             }
 
-                            Box {
-                                IconButton(onClick = { /* Navigate to notifications */ }) {
+                            // FIXED: Notification Bell with Red Dot and Click Handler
+                            Box(
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        // Navigate to notifications screen
+                                        onNavigateToNotifications()
+                                    }
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.Notifications,
                                         contentDescription = "Notifications",
-                                        tint = Color.White
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
 
+                                // Red dot indicator for unread messages
                                 if (unreadCount > 0) {
                                     Box(
                                         modifier = Modifier
                                             .size(20.dp)
-                                            .offset(x = 24.dp, y = 8.dp)
+                                            .offset(x = 28.dp, y = 4.dp)
                                             .clip(CircleShape)
                                             .background(AccentRed),
                                         contentAlignment = Alignment.Center

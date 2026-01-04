@@ -23,7 +23,6 @@ class FirebaseRepository {
 
     suspend fun addUser(user: User): Result<String> {
         return try {
-            // Generate a unique key for new users
             val userId = if (user.id == 0) {
                 usersRef.push().key ?: System.currentTimeMillis().toString()
             } else {
@@ -362,6 +361,79 @@ class FirebaseRepository {
         }
     }
 
+    suspend fun updateReview(review: Review): Result<Unit> {
+        return try {
+            val reviewMap = hashMapOf<String, Any>(
+                "id" to review.id,
+                "employeeId" to review.employeeId,
+                "date" to review.date,
+                "quality" to review.quality,
+                "communication" to review.communication,
+                "innovation" to review.innovation,
+                "timeliness" to review.timeliness,
+                "attendance" to review.attendance,
+                "overallRating" to review.overallRating,
+                "remarks" to review.remarks,
+                "reviewedBy" to review.reviewedBy
+            )
+            reviewsRef.child(review.id.toString()).setValue(reviewMap).await()
+            Log.d(tag, "Review updated successfully")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating review: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteReview(reviewId: Int): Result<Unit> {
+        return try {
+            reviewsRef.child(reviewId.toString()).removeValue().await()
+            Log.d(tag, "Review deleted successfully: $reviewId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting review: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    fun getAllReviewsFlow(): Flow<List<Review>> = callbackFlow {
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val reviews = mutableListOf<Review>()
+                snapshot.children.forEach { child ->
+                    try {
+                        val review = Review(
+                            id = (child.child("id").value as? Long)?.toInt()
+                                ?: child.child("id").value.toString().toIntOrNull() ?: 0,
+                            employeeId = (child.child("employeeId").value as? Long)?.toInt()
+                                ?: child.child("employeeId").value.toString().toIntOrNull() ?: 0,
+                            date = child.child("date").value?.toString() ?: "",
+                            quality = (child.child("quality").value as? Number)?.toFloat() ?: 0f,
+                            communication = (child.child("communication").value as? Number)?.toFloat() ?: 0f,
+                            innovation = (child.child("innovation").value as? Number)?.toFloat() ?: 0f,
+                            timeliness = (child.child("timeliness").value as? Number)?.toFloat() ?: 0f,
+                            attendance = (child.child("attendance").value as? Number)?.toFloat() ?: 0f,
+                            overallRating = (child.child("overallRating").value as? Number)?.toFloat() ?: 0f,
+                            remarks = child.child("remarks").value?.toString() ?: "",
+                            reviewedBy = child.child("reviewedBy").value?.toString() ?: ""
+                        )
+                        reviews.add(review)
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error parsing review: ${e.message}", e)
+                    }
+                }
+                trySend(reviews)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(tag, "Reviews listener cancelled: ${error.message}")
+                close(error.toException())
+            }
+        }
+        reviewsRef.addValueEventListener(listener)
+        awaitClose { reviewsRef.removeEventListener(listener) }
+    }
+
     fun getReviewsByEmployeeFlow(employeeId: Int): Flow<List<Review>> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -553,57 +625,55 @@ class FirebaseRepository {
         awaitClose { attendanceRef.removeEventListener(listener) }
     }
 
-    // Add this method to FirebaseRepository.kt class
-
     /**
      * Cascade delete: Deletes employee and ALL related data from Firebase
      */
     suspend fun deleteEmployeeCascade(employeeId: Int): Result<Unit> {
         return try {
-            android.util.Log.d(tag, "Starting cascade delete for employee: $employeeId")
+            Log.d(tag, "Starting cascade delete for employee: $employeeId")
 
             // 1. Delete all tasks for this employee
             val tasksSnapshot = tasksRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
             tasksSnapshot.children.forEach { taskSnapshot ->
                 taskSnapshot.ref.removeValue().await()
-                android.util.Log.d(tag, "Deleted task: ${taskSnapshot.key}")
+                Log.d(tag, "Deleted task: ${taskSnapshot.key}")
             }
 
             // 2. Delete all reviews for this employee
             val reviewsSnapshot = reviewsRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
             reviewsSnapshot.children.forEach { reviewSnapshot ->
                 reviewSnapshot.ref.removeValue().await()
-                android.util.Log.d(tag, "Deleted review: ${reviewSnapshot.key}")
+                Log.d(tag, "Deleted review: ${reviewSnapshot.key}")
             }
 
             // 3. Delete all messages sent by or to this employee
             val messagesSentSnapshot = messagesRef.orderByChild("senderId").equalTo(employeeId.toDouble()).get().await()
             messagesSentSnapshot.children.forEach { messageSnapshot ->
                 messageSnapshot.ref.removeValue().await()
-                android.util.Log.d(tag, "Deleted sent message: ${messageSnapshot.key}")
+                Log.d(tag, "Deleted sent message: ${messageSnapshot.key}")
             }
 
             val messagesReceivedSnapshot = messagesRef.orderByChild("receiverId").equalTo(employeeId.toDouble()).get().await()
             messagesReceivedSnapshot.children.forEach { messageSnapshot ->
                 messageSnapshot.ref.removeValue().await()
-                android.util.Log.d(tag, "Deleted received message: ${messageSnapshot.key}")
+                Log.d(tag, "Deleted received message: ${messageSnapshot.key}")
             }
 
             // 4. Delete all attendance records for this employee
             val attendanceSnapshot = attendanceRef.orderByChild("employeeId").equalTo(employeeId.toDouble()).get().await()
             attendanceSnapshot.children.forEach { attSnapshot ->
                 attSnapshot.ref.removeValue().await()
-                android.util.Log.d(tag, "Deleted attendance: ${attSnapshot.key}")
+                Log.d(tag, "Deleted attendance: ${attSnapshot.key}")
             }
 
             // 5. Finally, delete the employee user record
             usersRef.child(employeeId.toString()).removeValue().await()
-            android.util.Log.d(tag, "Deleted employee user record: $employeeId")
+            Log.d(tag, "Deleted employee user record: $employeeId")
 
-            android.util.Log.d(tag, "✅ Successfully completed cascade delete for employee: $employeeId")
+            Log.d(tag, "✅ Successfully completed cascade delete for employee: $employeeId")
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e(tag, "❌ Error in cascade delete for employee $employeeId: ${e.message}", e)
+            Log.e(tag, "❌ Error in cascade delete for employee $employeeId: ${e.message}", e)
             Result.failure(e)
         }
     }

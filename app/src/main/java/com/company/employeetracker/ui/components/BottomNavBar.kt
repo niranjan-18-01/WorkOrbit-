@@ -80,7 +80,7 @@ fun AdminBottomNavBar(
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
+        tonalElevation = 6.dp
     ) {
         items.forEach { item ->
             NavigationBarItem(

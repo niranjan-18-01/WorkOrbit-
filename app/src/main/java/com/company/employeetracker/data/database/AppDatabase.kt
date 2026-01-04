@@ -87,6 +87,18 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
 
+            userDao.insertUser(
+                User(
+                    email = "nirumanu1801@gmail.com",
+                    password = "Niranjan@1801",
+                    name = "Niranjan",
+                    role = "admin",
+                    designation = "App Developer",
+                    department = "Development",
+                    joiningDate = "2024-01-01"
+                )
+            )
+
             // Note: No sample data added here
             // Production devices won't get test data
         }
