@@ -24,9 +24,21 @@ interface TaskDao {
     @Delete
     suspend fun deleteTask(task: Task)
 
+    // NEW: Delete task by ID
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    suspend fun deleteTaskById(taskId: Int)
+
+    // NEW: Delete all tasks for an employee
+    @Query("DELETE FROM tasks WHERE employeeId = :employeeId")
+    suspend fun deleteTasksForEmployee(employeeId: Int)
+
     @Query("SELECT COUNT(*) FROM tasks WHERE status = :status")
     suspend fun getTaskCountByStatus(status: String): Int
 
     @Query("SELECT COUNT(*) FROM tasks WHERE employeeId = :employeeId AND status = :status")
     suspend fun getEmployeeTaskCountByStatus(employeeId: Int, status: String): Int
+
+    // NEW: Clear all tasks (for debugging)
+    @Query("DELETE FROM tasks")
+    suspend fun clearAllTasks()
 }

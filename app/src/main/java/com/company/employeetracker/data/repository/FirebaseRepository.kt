@@ -244,15 +244,32 @@ class FirebaseRepository {
 
     suspend fun deleteTask(taskId: Int): Result<Unit> {
         return try {
+            Log.d(tag, "🗑️ Deleting task $taskId from Firebase")
+
+            // Delete the task from Firebase
             tasksRef.child(taskId.toString()).removeValue().await()
-            Log.d(tag, "Task deleted successfully: $taskId")
+
+            Log.d(tag, "✅ Task $taskId deleted successfully from Firebase")
+
+            // Wait a moment to ensure Firebase propagates the deletion
+            kotlinx.coroutines.delay(100)
+
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(tag, "Error deleting task: ${e.message}", e)
+            Log.e(tag, "❌ Error deleting task $taskId: ${e.message}", e)
             Result.failure(e)
         }
     }
 
+    suspend fun taskExists(taskId: Int): Boolean {
+        return try {
+            val snapshot = tasksRef.child(taskId.toString()).get().await()
+            snapshot.exists()
+        } catch (e: Exception) {
+            Log.e(tag, "Error checking task existence: ${e.message}", e)
+            false
+        }
+    }
     fun getAllTasksFlow(): Flow<List<Task>> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
