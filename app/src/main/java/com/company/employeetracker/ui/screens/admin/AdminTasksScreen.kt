@@ -50,7 +50,7 @@ fun AdminTasksScreen(
         return
     }
 
-    val allTasks by taskViewModel.allTasks.collectAsState()
+    val allTasks by taskViewModel.tasksSortedByDeadline.collectAsState()
     val employees by employeeViewModel.employees.collectAsState()
     val pendingCount by taskViewModel.pendingCount.collectAsState()
     val activeCount by taskViewModel.activeCount.collectAsState()
@@ -58,12 +58,30 @@ fun AdminTasksScreen(
 
     var selectedFilter by remember { mutableStateOf("All") }
 
+    val todayStart = java.time.LocalDate.now()
+        .atStartOfDay(java.time.ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+
+    val todayEnd = todayStart + (24 * 60 * 60 * 1000)
+
     val filteredTasks = when (selectedFilter) {
-        "High Priority" -> allTasks.filter { it.priority == "High" || it.priority == "Critical" }
-        "Due Today" -> allTasks.filter { it.deadline == java.time.LocalDate.now().toString() }
+
+        "High Priority" ->
+            allTasks.filter {
+                it.priority == "High" || it.priority == "Critical"
+            }
+
+        "Due Today" ->
+            allTasks.filter {
+                it.deadlineTimestamp in todayStart until todayEnd
+            }
+
         "My Tasks" -> allTasks
+
         else -> allTasks
     }
+
 
     val totalTasks = allTasks.size
     val completionRate = if (totalTasks > 0) (completedCount * 100) / totalTasks else 0

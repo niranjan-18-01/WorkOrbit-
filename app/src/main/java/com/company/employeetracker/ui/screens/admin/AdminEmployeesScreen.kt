@@ -202,7 +202,7 @@ fun AdminEmployeesScreen(
                         StatCard(
                             modifier = Modifier.weight(1f),
                             icon = Icons.Default.People,
-                            value = "(${filteredEmployees.size})",
+                            value = "${filteredEmployees.size}",
                             label = "Total",
                             color = AccentBlue
                         )
@@ -210,7 +210,7 @@ fun AdminEmployeesScreen(
                         StatCard(
                             modifier = Modifier.weight(1f),
                             icon = Icons.Default.CheckCircle,
-                            value = "5",
+                            value = "${avgRating}",
                             label = "Active",
                             color = GreenPrimary
                         )
@@ -218,7 +218,7 @@ fun AdminEmployeesScreen(
                         StatCard(
                             modifier = Modifier.weight(1f),
                             icon = Icons.Default.Star,
-                            value = "4.3",
+                            value = "${activeEmployees}",
                             label = "Rating",
                             color = AccentYellow
                         )

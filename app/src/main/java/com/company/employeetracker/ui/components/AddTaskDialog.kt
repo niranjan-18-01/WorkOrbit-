@@ -1,5 +1,6 @@
 package com.company.employeetracker.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,8 +20,9 @@ import com.company.employeetracker.data.database.entities.Task
 import com.company.employeetracker.ui.theme.GreenPrimary
 import com.company.employeetracker.viewmodel.EmployeeViewModel
 import com.company.employeetracker.viewmodel.TaskViewModel
-import java.time.LocalDate
-import android.annotation.SuppressLint
+import java.time.*
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("NewApi")
@@ -31,6 +33,7 @@ fun AddTaskDialog(
     employeeViewModel: EmployeeViewModel = viewModel(),
     taskViewModel: TaskViewModel = viewModel()
 ) {
+
     val employees by employeeViewModel.employees.collectAsState()
 
     var title by remember { mutableStateOf("") }
@@ -38,68 +41,103 @@ fun AddTaskDialog(
     var selectedEmployee by remember { mutableStateOf("Select Employee") }
     var selectedEmployeeId by remember { mutableIntStateOf(0) }
     var priority by remember { mutableStateOf("Medium") }
-    var deadline by remember { mutableStateOf(LocalDate.now().plusDays(7).toString()) }
+
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    var deadline by remember {
+        mutableStateOf(
+            LocalDate.now().plusDays(7).format(formatter)
+        )
+    }
+
+    var deadlineTimestamp by remember {
+        mutableLongStateOf(
+            LocalDate.now().plusDays(7)
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        )
+    }
+
     var employeeExpanded by remember { mutableStateOf(false) }
     var priorityExpanded by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    // Validation states
     var titleError by remember { mutableStateOf("") }
     var descriptionError by remember { mutableStateOf("") }
     var employeeError by remember { mutableStateOf("") }
 
     val priorities = listOf("Low", "Medium", "High", "Critical")
 
-    // Validate fields
-    fun validateFields(): Boolean {
-        var isValid = true
+    val todayMillis = java.time.LocalDate.now()
+        .atStartOfDay(java.time.ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
 
-        if (title.isBlank()) {
-            titleError = "Task title is required"
-            isValid = false
-        } else if (title.length < 5) {
-            titleError = "Title must be at least 5 characters"
-            isValid = false
-        } else {
-            titleError = ""
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = deadlineTimestamp,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                return utcTimeMillis >= todayMillis
+            }
+        }
+    )
+
+    val selectedDate = remember(deadlineTimestamp) {
+        java.time.Instant.ofEpochMilli(deadlineTimestamp)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDate()
+    }
+
+    val isWeekend =
+        selectedDate.dayOfWeek == java.time.DayOfWeek.SATURDAY ||
+                selectedDate.dayOfWeek == java.time.DayOfWeek.SUNDAY
+
+    if (isWeekend) {
+        Text(
+            text = "⚠ Deadline falls on a weekend",
+            color = MaterialTheme.colorScheme.error,
+            fontSize = 12.sp
+        )
+    }
+
+
+    fun validateFields(): Boolean {
+        var valid = true
+
+        if (title.length < 5) {
+            titleError = "Minimum 5 characters"
+            valid = false
         }
 
-        if (description.isBlank()) {
-            descriptionError = "Task description is required"
-            isValid = false
-        } else if (description.length < 10) {
-            descriptionError = "Description must be at least 10 characters"
-            isValid = false
-        } else {
-            descriptionError = ""
+        if (description.length < 10) {
+            descriptionError = "Minimum 10 characters"
+            valid = false
         }
 
         if (selectedEmployeeId == 0) {
-            employeeError = "Please select an employee"
-            isValid = false
-        } else {
-            employeeError = ""
+            employeeError = "Select an employee"
+            valid = false
         }
 
-        return isValid
+        return valid
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth()
+        onDismissRequest = onDismiss
     ) {
+
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
         ) {
+
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -107,21 +145,18 @@ fun AddTaskDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Create New Task",
+                        "Create New Task",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
-                        )
+                        Icon(Icons.Default.Close, null)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Title Field
+                // Title
                 OutlinedTextField(
                     value = title,
                     onValueChange = {
@@ -129,26 +164,19 @@ fun AddTaskDialog(
                         titleError = ""
                     },
                     label = { Text("Task Title *") },
-                    placeholder = { Text("Enter task title") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Assignment, contentDescription = null)
-                    },
+                    leadingIcon = { Icon(Icons.Default.Assignment, null) },
                     isError = titleError.isNotEmpty(),
                     supportingText = {
                         if (titleError.isNotEmpty()) {
-                            Text(
-                                text = titleError,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                            Text(titleError, color = MaterialTheme.colorScheme.error)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Description Field
+                // Description
                 OutlinedTextField(
                     value = description,
                     onValueChange = {
@@ -156,77 +184,53 @@ fun AddTaskDialog(
                         descriptionError = ""
                     },
                     label = { Text("Description *") },
-                    placeholder = { Text("Enter detailed task description") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Description, contentDescription = null)
-                    },
+                    leadingIcon = { Icon(Icons.Default.Description, null) },
+                    minLines = 3,
                     isError = descriptionError.isNotEmpty(),
                     supportingText = {
                         if (descriptionError.isNotEmpty()) {
-                            Text(
-                                text = descriptionError,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                            Text(descriptionError, color = MaterialTheme.colorScheme.error)
                         }
                     },
-                    minLines = 3,
-                    maxLines = 5,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Employee Selection Dropdown
+                // Employee Dropdown
                 ExposedDropdownMenuBox(
                     expanded = employeeExpanded,
                     onExpandedChange = { employeeExpanded = !employeeExpanded }
                 ) {
+
                     OutlinedTextField(
                         value = selectedEmployee,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Assign To *") },
+                        leadingIcon = { Icon(Icons.Default.Person, null) },
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = employeeExpanded)
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Person, contentDescription = null)
+                            ExposedDropdownMenuDefaults.TrailingIcon(employeeExpanded)
                         },
                         isError = employeeError.isNotEmpty(),
                         supportingText = {
                             if (employeeError.isNotEmpty()) {
-                                Text(
-                                    text = employeeError,
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                                Text(employeeError, color = MaterialTheme.colorScheme.error)
                             }
                         },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
 
                     ExposedDropdownMenu(
                         expanded = employeeExpanded,
                         onDismissRequest = { employeeExpanded = false }
                     ) {
-                        employees.forEach { employee ->
+                        employees.forEach {
                             DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(employee.name, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "${employee.designation} • ${employee.department}",
-                                            fontSize = 12.sp,
-                                            color = Color(0xFF757575)
-                                        )
-                                    }
-                                },
+                                text = { Text(it.name) },
                                 onClick = {
-                                    selectedEmployee = employee.name
-                                    selectedEmployeeId = employee.id
+                                    selectedEmployee = it.name
+                                    selectedEmployeeId = it.id
                                     employeeExpanded = false
                                     employeeError = ""
                                 }
@@ -235,39 +239,35 @@ fun AddTaskDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Priority Dropdown
+                // Priority
                 ExposedDropdownMenuBox(
                     expanded = priorityExpanded,
                     onExpandedChange = { priorityExpanded = !priorityExpanded }
                 ) {
+
                     OutlinedTextField(
                         value = priority,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Priority *") },
+                        label = { Text("Priority") },
+                        leadingIcon = { Icon(Icons.Default.PriorityHigh, null) },
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = priorityExpanded)
+                            ExposedDropdownMenuDefaults.TrailingIcon(priorityExpanded)
                         },
-                        leadingIcon = {
-                            Icon(Icons.Default.PriorityHigh, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
 
                     ExposedDropdownMenu(
                         expanded = priorityExpanded,
                         onDismissRequest = { priorityExpanded = false }
                     ) {
-                        priorities.forEach { pri ->
+                        priorities.forEach {
                             DropdownMenuItem(
-                                text = { Text(pri) },
+                                text = { Text(it) },
                                 onClick = {
-                                    priority = pri
+                                    priority = it
                                     priorityExpanded = false
                                 }
                             )
@@ -275,40 +275,31 @@ fun AddTaskDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Deadline Info
+                // Deadline Field
                 OutlinedTextField(
-                    value = "Due: ${deadline}",
+                    value = deadline,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Deadline") },
-                    leadingIcon = {
-                        Icon(Icons.Default.CalendarToday, contentDescription = null)
+                    label = { Text("Deadline *") },
+                    leadingIcon = { Icon(Icons.Default.CalendarToday, null) },
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Default.DateRange, null)
+                        }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(24.dp))
 
-                Text(
-                    text = "* Required fields",
-                    fontSize = 12.sp,
-                    color = Color(0xFF757575)
-                )
+                // Buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text("Cancel")
                     }
@@ -316,36 +307,89 @@ fun AddTaskDialog(
                     Button(
                         onClick = {
                             if (validateFields()) {
-                                val newTask = Task(
-                                    employeeId = selectedEmployeeId,
-                                    title = title,
-                                    description = description,
-                                    priority = priority,
-                                    status = "Pending",
-                                    deadline = deadline,
-                                    assignedDate = LocalDate.now().toString()
+                                taskViewModel.addTask(
+                                    Task(
+                                        employeeId = selectedEmployeeId,
+                                        title = title,
+                                        description = description,
+                                        priority = priority,
+                                        status = "Pending",
+                                        deadline = deadline,
+                                        deadlineTimestamp = deadlineTimestamp,
+                                        assignedDate = LocalDate.now().toString()
+                                    )
                                 )
-                                taskViewModel.addTask(newTask)
                                 onTaskAdded()
                                 onDismiss()
                             }
                         },
-                        modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = GreenPrimary
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(6.dp))
                         Text("Create Task")
                     }
                 }
             }
+        }
+    }
+
+    // ================= DATE PICKER =================
+
+    if (showDatePicker) {
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+
+                            val selectedDate = java.time.Instant
+                                .ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+
+                            deadline = selectedDate.format(
+                                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                            )
+
+                            deadlineTimestamp = millis
+
+                            // ✅ AUTO PRIORITY
+                            val daysLeft = java.time.temporal.ChronoUnit.DAYS.between(
+                                java.time.LocalDate.now(),
+                                selectedDate
+                            )
+
+                            priority = when {
+                                daysLeft <= 1 -> "Critical"
+                                daysLeft <= 3 -> "High"
+                                daysLeft <= 7 -> "Medium"
+                                else -> "Low"
+                            }
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+
+        ) {
+            DatePicker(
+                state = datePickerState
+            )
         }
     }
 }

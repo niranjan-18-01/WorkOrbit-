@@ -51,7 +51,7 @@ fun StatCard(
 
                 Text(
                     text = value,
-                    fontSize = 24.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = color
                 )
@@ -60,8 +60,8 @@ fun StatCard(
             /* LABEL */
             Text(
                 text = label,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
